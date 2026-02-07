@@ -1,0 +1,26 @@
+[gd_resource type="AnimationNodeBlendTree" format=3 uid="uid://44mnpacnhykk"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_pmjw1"]
+animation = &"Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_j7yws"]
+animation = &"WalkForward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_tmmgr"]
+animation = &"RunForward"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_gpi6q"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_pmjw1")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_j7yws")
+blend_point_1/pos = 0.5
+blend_point_2/node = SubResource("AnimationNodeAnimation_tmmgr")
+blend_point_2/pos = 1.0
+min_space = 0.0
+sync = true
+
+[resource]
+graph_offset = Vector2(-779.52, -8.64)
+nodes/move/node = SubResource("AnimationNodeBlendSpace1D_gpi6q")
+nodes/move/position = Vector2(-500, 180)
+node_connections = [&"output", 0, &"move"]

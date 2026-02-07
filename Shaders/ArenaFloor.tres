@@ -1,0 +1,49 @@
+[gd_resource type="VisualShader" format=3 uid="uid://cbujwstf1fso7"]
+
+[ext_resource type="Texture2D" uid="uid://bk2afirbjeaf8" path="res://Textures/arena_floor_noise_texture_2d.tres" id="1_hwgk1"]
+[ext_resource type="Texture2D" uid="uid://dpc7h31442bxn" path="res://Textures/arena_floor_normal_texture_2d.tres" id="2_53mq2"]
+
+[sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_vi7jw"]
+expanded_output_ports = [0]
+texture = ExtResource("1_hwgk1")
+
+[sub_resource type="VisualShaderNodeColorConstant" id="VisualShaderNodeColorConstant_fsdfq"]
+constant = Color(0.409462, 0.188763, 0.0310689, 1)
+
+[sub_resource type="VisualShaderNodeColorConstant" id="VisualShaderNodeColorConstant_rjncq"]
+constant = Color(0.241004, 0.0968087, 0.0222809, 1)
+
+[sub_resource type="VisualShaderNodeMix" id="VisualShaderNodeMix_gj8pw"]
+output_port_for_preview = 0
+default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(1, 1, 1), 2, Vector3(0.5, 0.5, 0.5)]
+expanded_output_ports = [0]
+op_type = 3
+
+[sub_resource type="VisualShaderNodeMultiplyAdd" id="VisualShaderNodeMultiplyAdd_icoit"]
+default_input_values = [0, 0.0, 1, 1.25, 2, 0.0]
+
+[sub_resource type="VisualShaderNodeFloatOp" id="VisualShaderNodeFloatOp_ld5c2"]
+default_input_values = [0, 0.0, 1, 0.5]
+
+[sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_au0vu"]
+output_port_for_preview = 0
+expanded_output_ports = [0]
+texture = ExtResource("2_53mq2")
+
+[resource]
+nodes/fragment/0/position = Vector2(2040, 160)
+nodes/fragment/2/node = SubResource("VisualShaderNodeTexture_vi7jw")
+nodes/fragment/2/position = Vector2(160, 580)
+nodes/fragment/3/node = SubResource("VisualShaderNodeColorConstant_fsdfq")
+nodes/fragment/3/position = Vector2(740, 40)
+nodes/fragment/4/node = SubResource("VisualShaderNodeColorConstant_rjncq")
+nodes/fragment/4/position = Vector2(740, 200)
+nodes/fragment/5/node = SubResource("VisualShaderNodeMix_gj8pw")
+nodes/fragment/5/position = Vector2(1220, -100)
+nodes/fragment/6/node = SubResource("VisualShaderNodeMultiplyAdd_icoit")
+nodes/fragment/6/position = Vector2(860, 560)
+nodes/fragment/7/node = SubResource("VisualShaderNodeFloatOp_ld5c2")
+nodes/fragment/7/position = Vector2(1240, 560)
+nodes/fragment/8/node = SubResource("VisualShaderNodeTexture_au0vu")
+nodes/fragment/8/position = Vector2(240, 1160)
+nodes/fragment/connections = PackedInt32Array(2, 0, 6, 0, 6, 0, 5, 2, 5, 0, 0, 0, 3, 0, 5, 0, 4, 0, 5, 1, 6, 0, 7, 0, 7, 0, 0, 3, 8, 0, 0, 9)

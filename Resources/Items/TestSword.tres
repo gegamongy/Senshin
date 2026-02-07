@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="WeaponItem" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Resources/WeaponItem.gd" id="1_weapon"]
+[ext_resource type="Texture2D" path="res://Assets/placeholder_item_icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_weapon")
+item_name = "Test Sword"
+description = "A simple test weapon for testing the pickup system."
+icon = ExtResource("2_icon")
+item_type = 0
+stack_size = 1
+is_equippable = true
+weapon_slot = 0
+damage = 25.0
+attack_speed = 1.2
+range = 1.5

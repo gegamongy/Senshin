@@ -1,0 +1,393 @@
+[gd_scene format=3 uid="uid://bbpir5aketcxk"]
+
+[ext_resource type="Script" uid="uid://0j3dhr33ghch" path="res://Scripts/UI/InventoryUIController.gd" id="1_03hdg"]
+[ext_resource type="Theme" uid="uid://cqf8yk7drdysx" path="res://Themes/InventoryTheme.tres" id="2_theme"]
+
+[node name="InventoryUI" type="CanvasLayer" unique_id=2036846543]
+script = ExtResource("1_03hdg")
+
+[node name="Panel" type="Panel" parent="." unique_id=327521363]
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.05
+anchor_right = 0.95
+anchor_bottom = 0.95
+grow_horizontal = 2
+grow_vertical = 2
+theme = ExtResource("2_theme")
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel" unique_id=939173283]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/MarginContainer" unique_id=131527038]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="LeftPanel" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer" unique_id=1325323103]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.4
+
+[node name="SubViewportContainer" type="SubViewportContainer" parent="Panel/MarginContainer/HBoxContainer/LeftPanel" unique_id=1497473871]
+layout_mode = 2
+stretch = true
+
+[node name="SubViewport" type="SubViewport" parent="Panel/MarginContainer/HBoxContainer/LeftPanel/SubViewportContainer" unique_id=962006778]
+transparent_bg = true
+handle_input_locally = false
+size = Vector2i(390, 543)
+size_2d_override_stretch = true
+render_target_update_mode = 4
+
+[node name="RightPanel" type="VBoxContainer" parent="Panel/MarginContainer/HBoxContainer" unique_id=1498669134]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.6
+
+[node name="TabContainer" type="TabContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel" unique_id=920615761]
+layout_mode = 2
+size_flags_vertical = 3
+current_tab = 0
+
+[node name="Equipment" type="ScrollContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer" unique_id=913587174]
+layout_mode = 2
+metadata/_tab_index = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment" unique_id=1669243046]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="WeaponsHeader" type="HBoxContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer" unique_id=683036384]
+layout_mode = 2
+
+[node name="WeaponIcon" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/WeaponsHeader" unique_id=1756350259]
+layout_mode = 2
+text = "⚔️"
+horizontal_alignment = 1
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/WeaponsHeader" unique_id=1309342110]
+layout_mode = 2
+text = "WEAPONS"
+vertical_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/WeaponsHeader" unique_id=2122715675]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="WeaponSlots" type="HBoxContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer" unique_id=947202902]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PrimaryWeapon" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/WeaponSlots" unique_id=1553195859]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/WeaponSlots/PrimaryWeapon" unique_id=29106202]
+layout_mode = 2
+text = "Primary"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="SecondaryWeapon" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/WeaponSlots" unique_id=919965649]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/WeaponSlots/SecondaryWeapon" unique_id=617780486]
+layout_mode = 2
+text = "Secondary"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ClothesHeader" type="HBoxContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer" unique_id=43594551]
+layout_mode = 2
+
+[node name="ClothesIcon" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothesHeader" unique_id=1958860537]
+layout_mode = 2
+text = "👕"
+horizontal_alignment = 1
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothesHeader" unique_id=1583710958]
+layout_mode = 2
+text = "CLOTHES"
+vertical_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothesHeader" unique_id=1838440546]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ClothingSlots" type="VBoxContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer" unique_id=652738527]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Headgear" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots" unique_id=1399074440]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots/Headgear" unique_id=2064058442]
+layout_mode = 2
+text = "Headgear"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Chestwear" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots" unique_id=1934119817]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots/Chestwear" unique_id=306718137]
+layout_mode = 2
+text = "Chestwear"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Legwear" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots" unique_id=1139541726]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots/Legwear" unique_id=41246896]
+layout_mode = 2
+text = "Legwear"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Footwear" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots" unique_id=1906765003]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Equipment/VBoxContainer/ClothingSlots/Footwear" unique_id=2098088762]
+layout_mode = 2
+text = "Footwear"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="Inventory" type="ScrollContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer" unique_id=1666707447]
+visible = false
+layout_mode = 2
+metadata/_tab_index = 1
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory" unique_id=864665765]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="InventoryGrid" type="GridContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer" unique_id=634039404]
+layout_mode = 2
+theme_override_constants/h_separation = 5
+theme_override_constants/v_separation = 5
+columns = 8
+
+[node name="Slot1" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=136398289]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot2" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1264270866]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot3" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=680195166]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot4" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=219929097]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot5" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1508151064]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot6" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1852864966]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot7" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=417520154]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot8" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=258193649]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot9" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1405925596]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot10" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=2143939021]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot11" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1741904109]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot12" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=173322936]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot13" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=237906182]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot14" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=471986578]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot15" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1643809207]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot16" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=129211104]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot17" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=308000041]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot18" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1324111978]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot19" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1650314647]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot20" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=2094458557]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot21" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=840593322]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot22" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=64373891]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot23" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=110527524]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot24" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1773518133]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot25" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=814145951]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot26" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1904868988]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot27" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=42186081]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot28" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=641017167]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot29" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1619560076]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot30" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=331086015]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot31" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=955624818]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot32" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1419877518]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot33" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1853791213]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot34" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1527654880]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot35" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1664319701]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot36" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=646712097]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot37" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=2044083126]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot38" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1932683808]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot39" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=714166287]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot40" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=780382709]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot41" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=997394888]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot42" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=330588620]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot43" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=23430877]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot44" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1414043484]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot45" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=1453665584]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot46" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=2147230885]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot47" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=911222172]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="Slot48" type="PanelContainer" parent="Panel/MarginContainer/HBoxContainer/RightPanel/TabContainer/Inventory/MarginContainer/InventoryGrid" unique_id=13393212]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="Panel" unique_id=160784828]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -100.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 50.0
+grow_horizontal = 0
+text = "Close [ESC]"

@@ -1,0 +1,50 @@
+[gd_scene format=3 uid="uid://bv8lk2pk6x5ao"]
+
+[ext_resource type="Shader" uid="uid://cbujwstf1fso7" path="res://Shaders/ArenaFloor.tres" id="1_vqekq"]
+[ext_resource type="PackedScene" uid="uid://iopytyrkcukj" path="res://Assets/Player/Player.tscn" id="2_vr44f"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sren0"]
+sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
+
+[sub_resource type="Sky" id="Sky_11127"]
+sky_material = SubResource("ProceduralSkyMaterial_sren0")
+
+[sub_resource type="Environment" id="Environment_pw3fo"]
+background_mode = 2
+sky = SubResource("Sky_11127")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="BoxMesh" id="BoxMesh_pw3fo"]
+size = Vector3(500, 1, 500)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_4istu"]
+render_priority = 0
+shader = ExtResource("1_vqekq")
+
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_sren0"]
+data = PackedVector3Array(-250, 0.5, -250, -250, -0.5, -250, 250, -0.5, -250, -250, 0.5, 250, -250, -0.5, 250, -250, -0.5, -250, -250, -0.5, 250, 250, -0.5, 250, -250, -0.5, -250, -250, 0.5, -250, -250, 0.5, 250, -250, -0.5, -250, -250, 0.5, 250, -250, 0.5, -250, 250, 0.5, -250, -250, 0.5, 250, 250, 0.5, 250, -250, -0.5, 250, 250, -0.5, 250, 250, -0.5, -250, -250, -0.5, -250, 250, 0.5, -250, 250, -0.5, -250, 250, -0.5, 250, 250, 0.5, 250, 250, -0.5, 250, -250, -0.5, 250, 250, 0.5, -250, -250, 0.5, -250, 250, -0.5, -250, 250, 0.5, 250, -250, 0.5, 250, 250, 0.5, -250, 250, 0.5, 250, 250, 0.5, -250, 250, -0.5, 250)
+
+[node name="Node3D" type="Node3D" unique_id=1316593237]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=576582280]
+environment = SubResource("Environment_pw3fo")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=464541010]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+directional_shadow_max_distance = 1.0
+
+[node name="CSGMesh3D" type="CSGMesh3D" parent="." unique_id=1829835939]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
+mesh = SubResource("BoxMesh_pw3fo")
+material = SubResource("ShaderMaterial_4istu")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="CSGMesh3D" unique_id=893583800]
+
+[node name="CSGBakedCollisionShape3D" type="CollisionShape3D" parent="CSGMesh3D/StaticBody3D" unique_id=1252841860]
+shape = SubResource("ConcavePolygonShape3D_sren0")
+
+[node name="Player" parent="." unique_id=636244937 instance=ExtResource("2_vr44f")]
+air_control = 0.5
