@@ -12,8 +12,13 @@ extends CharacterBody3D
 @export var gamepad_look_sensitivity: float = 3.0  # Sensitivity for gamepad right stick
 @export_range(0.0, 1.0) var air_control: float = 1.0  # How much input affects air speed
 
-const SPEED = 15.0
-const JUMP_VELOCITY = 10
+# Jump physics
+@export var gravity_multiplier: float = 2.5  # Multiply gravity when falling for snappier jumps
+@export var jump_cut_multiplier: float = 0.5  # Multiply upward velocity when releasing jump early
+@export var terminal_velocity: float = -50.0  # Maximum fall speed
+@export var  JUMP_VELOCITY = 10
+
+const AIR_SPEED = 15.0 #
 const MIN_Y_ROTATION = -80
 const MAX_Y_ROTATION = 80
 const INPUT_ACCEL_SPEED = 10.0  # How fast input magnitude changes
@@ -152,7 +157,11 @@ func update_animation_conditions():
 
 func apply_gravity(delta: float):
 	if not is_on_floor():
-		velocity.y -= gravity * delta
+		# Apply gravity multiplier throughout entire jump for less floaty feel
+		velocity.y -= gravity * gravity_multiplier * delta
+		
+		# Cap fall speed to terminal velocity
+		velocity.y = max(velocity.y, terminal_velocity)
 
 
 func calculate_movement_direction() -> Vector3:
@@ -281,7 +290,7 @@ func handle_air_movement(has_movement: bool, move_dir: Vector3, delta: float):
 		lerp_body_rotation(move_dir, delta)
 		
 		# Calculate target velocity based on input
-		var target_velocity = move_dir * SPEED
+		var target_velocity = move_dir * AIR_SPEED
 		
 		# Lerp between current velocity and target based on air_control
 		# air_control = 0: keep current velocity (momentum preservation)
@@ -365,6 +374,10 @@ func _input(event):
 		
 
 func handle_jump_input():
+	# Handle jump cut - reduce upward velocity when releasing jump early
+	if Input.is_action_just_released("jump") and velocity.y > 0:
+		velocity.y *= jump_cut_multiplier
+	
 	# Handle jump input and set direction
 	if Input.is_action_just_pressed("jump") and is_on_floor():
 		# Determine if this is a backward jump (backflip) based on movement vs facing direction

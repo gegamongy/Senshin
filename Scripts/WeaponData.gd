@@ -14,8 +14,7 @@ enum WeaponSlot {
 @export var stamina_costs: Dictionary
 @export var movement_modifiers: Dictionary
 
-# Visual/positioning
-@export var sheathe_offset: float = 0.0
+
 
 
 # Combat stats
