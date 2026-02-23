@@ -2,12 +2,14 @@
 
 [ext_resource type="Script" uid="uid://c8blpbo1vy4qs" path="res://Scripts/WeaponBase.gd" id="2_2diko"]
 [ext_resource type="Texture2D" uid="uid://coaqrqcni6p03" path="res://Assets/placeholder_item_icon.svg" id="2_evdka"]
+[ext_resource type="AnimationLibrary" uid="uid://b2xj30yrbfuju" path="res://AnimationLibraries/KatanaAnimLibrary.res" id="2_q8lt3"]
 [ext_resource type="Script" uid="uid://bhpdhnliibs8b" path="res://Scripts/WeaponData.gd" id="3_q8lt3"]
 
 [sub_resource type="Resource" id="Resource_4n32v"]
 script = ExtResource("3_q8lt3")
 weapon_scene_path = "uid://umqr5sg1nb5g"
 weapon_type = "katana"
+anim_library = ExtResource("2_q8lt3")
 item_name = "Starting Katana"
 icon = ExtResource("2_evdka")
 item_type = 0

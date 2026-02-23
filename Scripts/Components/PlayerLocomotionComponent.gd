@@ -7,7 +7,7 @@ class_name PlayerLocomotionComponent
 @export var gravity_multiplier: float = 2.5
 @export var jump_cut_multiplier: float = 0.5
 @export var terminal_velocity: float = -50.0
-@export var jump_velocity: float = 10.0
+@export var jump_velocity: float = 20.0
 
 const AIR_SPEED = 15.0
 const INPUT_ACCEL_SPEED = 10.0

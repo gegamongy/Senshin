@@ -164,6 +164,10 @@ func equip_item(item: Item) -> bool:
 					equipped_secondary_weapon.queue_free()
 				equipped_secondary_weapon = weapon_instance
 			
+			# Notify player's combat component through player controller
+			if player.has_method("equip_weapon_data"):
+				player.equip_weapon_data(weapon)
+			
 			print("Equipped weapon: ", weapon.item_name)
 			return true
 	
@@ -179,6 +183,15 @@ func unequip_item(item: Item) -> bool:
 	# If it's a weapon, remove the instance
 	if item is WeaponData:
 		var weapon = item as WeaponData
+		
+		# Get player reference
+		var player = get_tree().get_first_node_in_group("player")
+		
+		# Notify player's combat component through player controller
+		if player and player.has_method("unequip_weapon_slot"):
+			player.unequip_weapon_slot(weapon.weapon_slot)
+		
+		# Remove visual instance
 		if weapon.weapon_slot == WeaponData.WeaponSlot.PRIMARY:
 			if equipped_primary_weapon:
 				equipped_primary_weapon.queue_free()

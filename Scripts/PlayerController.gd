@@ -45,8 +45,8 @@ func setup_components():
 	
 	# Initialize components with required references
 	locomotion_component.initialize(self)
-	combat_component.initialize()
 	animation_controller.initialize(animation_tree, self, locomotion_component)
+	combat_component.initialize(animation_controller)
 	camera_controller.initialize(camera_pivot, camera, self, input_component)
 	
 	# Setup state machine
@@ -57,6 +57,7 @@ func setup_components():
 	input_component.jump_released.connect(_on_jump_released)
 	input_component.pickup_pressed.connect(_on_pickup_pressed)
 	input_component.inventory_toggled.connect(_on_inventory_toggled)
+	input_component.sheathe_unsheathe_pressed.connect(_on_sheathe_unsheathe_pressed)
 
 
 func setup_state_machine():
@@ -108,6 +109,23 @@ func setup_state_machine():
 	landing.player = self
 	landing.animation_controller = animation_controller
 	player_state_machine.add_child(landing)
+	
+	# Create combat states
+	var unsheathe = UnsheatheState.new()
+	unsheathe.name = "Unsheathe"
+	unsheathe.locomotion = locomotion_component
+	unsheathe.player = self
+	unsheathe.animation_controller = animation_controller
+	unsheathe.combat_component = combat_component
+	player_state_machine.add_child(unsheathe)
+	
+	var sheathe = SheatheState.new()
+	sheathe.name = "Sheathe"
+	sheathe.locomotion = locomotion_component
+	sheathe.player = self
+	sheathe.animation_controller = animation_controller
+	sheathe.combat_component = combat_component
+	player_state_machine.add_child(sheathe)
 
 
 func _input(event):
@@ -180,6 +198,47 @@ func _on_pickup_pressed():
 func _on_inventory_toggled():
 	"""Handle inventory toggle"""
 	InventoryManager.toggle_inventory()
+
+
+func _on_sheathe_unsheathe_pressed():
+	"""Handle sheathe/unsheathe button press"""
+	# Check if player is grounded and not in middle of action
+	if not locomotion_component.get_is_grounded():
+		return
+	
+	# Check current state - only allow from idle or moving states
+	var current_state = player_state_machine.get_current_state_name()
+	if current_state not in ["GroundedIdle", "GroundedMoving"]:
+		print("[PlayerController] Cannot sheathe/unsheathe from state: ", current_state)
+		return
+	
+	if combat_component.is_armed:
+		# Unarm: Play sheathe animation first, then restore unarmed animations
+		print("[PlayerController] Unarming weapon...")
+		player_state_machine.change_state("Sheathe")
+		# The SheatheState will handle completion and call unarm_weapon
+	else:
+		# Arm: Swap to weapon animations first, then play unsheathe
+		print("[PlayerController] Arming weapon...")
+		if combat_component.arm_weapon(WeaponData.WeaponSlot.PRIMARY):
+			player_state_machine.change_state("Unsheathe")
+		else:
+			print("[PlayerController] Failed to arm weapon (no weapon equipped?)")
+
+
+#endregion
+
+
+#region Weapon Management
+
+func equip_weapon_data(weapon_data: WeaponData) -> void:
+	"""Called by InventoryManager when a weapon is equipped"""
+	combat_component.equip_weapon(weapon_data, weapon_data.weapon_slot)
+
+
+func unequip_weapon_slot(slot: WeaponData.WeaponSlot) -> void:
+	"""Called by InventoryManager when a weapon is unequipped"""
+	combat_component.unequip_weapon(slot)
 
 
 #endregion
