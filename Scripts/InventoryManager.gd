@@ -38,8 +38,7 @@ func open_inventory():
 	# Stop player movement
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
-		player.velocity = Vector3.ZERO
-		player.input_dir = Vector2.ZERO
+		player.disable_player_control()
 	
 	# Store mouse capture state
 	was_mouse_captured = Input.mouse_mode == Input.MOUSE_MODE_CAPTURED

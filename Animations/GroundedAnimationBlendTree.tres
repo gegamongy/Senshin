@@ -20,7 +20,7 @@ min_space = 0.0
 sync = true
 
 [resource]
-graph_offset = Vector2(-779.52, -8.64)
+graph_offset = Vector2(-567.3598, -11.519997)
 nodes/move/node = SubResource("AnimationNodeBlendSpace1D_gpi6q")
-nodes/move/position = Vector2(-500, 180)
+nodes/move/position = Vector2(-170, 150)
 node_connections = [&"output", 0, &"move"]
