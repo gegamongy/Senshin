@@ -289,3 +289,28 @@ func enable_player_control():
 
 
 #endregion
+
+
+#region Animation Event Forwarding (for InventoryManager autoload)
+
+func arm_primary_weapon() -> void:
+	"""Forward animation event to InventoryManager"""
+	InventoryManager.arm_primary_weapon()
+
+
+func unarm_primary_weapon() -> void:
+	"""Forward animation event to InventoryManager"""
+	InventoryManager.unarm_primary_weapon()
+
+
+func arm_secondary_weapon() -> void:
+	"""Forward animation event to InventoryManager"""
+	InventoryManager.arm_secondary_weapon()
+
+
+func unarm_secondary_weapon() -> void:
+	"""Forward animation event to InventoryManager"""
+	InventoryManager.unarm_secondary_weapon()
+
+
+#endregion

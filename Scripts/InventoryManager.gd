@@ -14,9 +14,13 @@ var player_inventory: InventoryData = null
 var equipped_primary_weapon: Node3D = null
 var equipped_secondary_weapon: Node3D = null
 
+# Store original weapon mesh transforms (relative to weapon base)
+var primary_weapon_mesh_original_transform: Transform3D = Transform3D.IDENTITY
+var secondary_weapon_mesh_original_transform: Transform3D = Transform3D.IDENTITY
 
 # Visual/positioning
-var sheathe_offset: float = 0.15
+var sheathe_offset: float = 0.0
+var hand_offset: Vector3 = Vector3.ZERO  # Adjust as needed for hand grip position
 
 
 func _ready():
@@ -159,10 +163,16 @@ func equip_item(item: Item) -> bool:
 				if equipped_primary_weapon:
 					equipped_primary_weapon.queue_free()
 				equipped_primary_weapon = weapon_instance
+				# Store original weapon mesh transform for later restoration
+				if weapon_instance is WeaponBase and weapon_instance.weapon_mesh:
+					primary_weapon_mesh_original_transform = weapon_instance.weapon_mesh.transform
 			else:
 				if equipped_secondary_weapon:
 					equipped_secondary_weapon.queue_free()
 				equipped_secondary_weapon = weapon_instance
+				# Store original weapon mesh transform for later restoration
+				if weapon_instance is WeaponBase and weapon_instance.weapon_mesh:
+					secondary_weapon_mesh_original_transform = weapon_instance.weapon_mesh.transform
 			
 			# Notify player's combat component through player controller
 			if player.has_method("equip_weapon_data"):
@@ -206,3 +216,101 @@ func unequip_item(item: Item) -> bool:
 	
 	print("Unequipped: ", item.item_name)
 	return true
+
+
+func set_weapon_armed_state(is_armed: bool, slot: WeaponData.WeaponSlot = WeaponData.WeaponSlot.PRIMARY) -> void:
+	"""Switch weapon between sheathe bone (unarmed) and hand bone (armed).
+	This method is intended to be called from animation events."""
+	
+	# Get the weapon instance
+	var weapon_instance = equipped_primary_weapon if slot == WeaponData.WeaponSlot.PRIMARY else equipped_secondary_weapon
+	if not weapon_instance:
+		print("[InventoryManager] No weapon equipped in slot to move")
+		return
+	
+	# Ensure it's a WeaponBase with weapon_mesh reference
+	if not weapon_instance is WeaponBase:
+		print("[InventoryManager] Error: Weapon instance is not a WeaponBase")
+		return
+	
+	var weapon_base = weapon_instance as WeaponBase
+	if not weapon_base.weapon_mesh:
+		print("[InventoryManager] Error: WeaponBase has no weapon_mesh assigned")
+		return
+	
+	# Get player and skeleton
+	var player = get_tree().get_first_node_in_group("player")
+	if not player:
+		print("[InventoryManager] Error: Player not found")
+		return
+	
+	var skeleton = player.find_child("Skeleton3D", true, false)
+	if not skeleton:
+		print("[InventoryManager] Error: Skeleton not found")
+		return
+	
+	if is_armed:
+		# Armed state - move weapon mesh to hand bone
+		var hand_bone_name = "Katana Hand Bone"
+		
+		# Verify hand bone exists
+		var bone_idx = skeleton.find_bone(hand_bone_name)
+		if bone_idx == -1:
+			print("[InventoryManager] Error: '", hand_bone_name, "' not found in skeleton")
+			return
+		
+		# Create BoneAttachment3D for hand bone
+		var hand_attachment = BoneAttachment3D.new()
+		hand_attachment.bone_name = hand_bone_name
+		skeleton.add_child(hand_attachment)
+		
+		# Reparent weapon mesh to hand
+		weapon_base.weapon_mesh.reparent(hand_attachment)
+		
+		# Reset transform and apply grip position
+		weapon_base.weapon_mesh.transform = Transform3D.IDENTITY
+		weapon_base.weapon_mesh.rotation_degrees = Vector3(90, 0, 0)
+		weapon_base.weapon_mesh.position = hand_offset
+		
+		print("[InventoryManager] Moved weapon mesh to hand (armed)")
+	else:
+		# Unarmed state - move weapon mesh back to weapon base (with sheathe)
+		
+		# Get the hand attachment (current parent) to clean it up
+		var hand_attachment = weapon_base.weapon_mesh.get_parent()
+		
+		# Reparent weapon mesh back to weapon base
+		weapon_base.weapon_mesh.reparent(weapon_base)
+		
+		# Restore original transform (how it was when first equipped)
+		if slot == WeaponData.WeaponSlot.PRIMARY:
+			weapon_base.weapon_mesh.transform = primary_weapon_mesh_original_transform
+		else:
+			weapon_base.weapon_mesh.transform = secondary_weapon_mesh_original_transform
+		
+		# Clean up hand attachment
+		if hand_attachment and hand_attachment is BoneAttachment3D:
+			hand_attachment.queue_free()
+		
+		print("[InventoryManager] Moved weapon mesh to sheathe (unarmed)")
+
+
+# Convenience methods for animation events (they can only call methods with no required parameters)
+func arm_primary_weapon() -> void:
+	"""Move primary weapon to hand - called by animation event"""
+	set_weapon_armed_state(true, WeaponData.WeaponSlot.PRIMARY)
+
+
+func unarm_primary_weapon() -> void:
+	"""Move primary weapon to sheathe - called by animation event"""
+	set_weapon_armed_state(false, WeaponData.WeaponSlot.PRIMARY)
+
+
+func arm_secondary_weapon() -> void:
+	"""Move secondary weapon to hand - called by animation event"""
+	set_weapon_armed_state(true, WeaponData.WeaponSlot.SECONDARY)
+
+
+func unarm_secondary_weapon() -> void:
+	"""Move secondary weapon to sheathe - called by animation event"""
+	set_weapon_armed_state(false, WeaponData.WeaponSlot.SECONDARY)

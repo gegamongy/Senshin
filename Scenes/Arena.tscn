@@ -114,9 +114,6 @@ shape = SubResource("ConcavePolygonShape3D_nf5yi")
 [node name="Table" parent="." unique_id=286183819 instance=ExtResource("5_4f205")]
 transform = Transform3D(0.024886977, 0, 0.68955106, 0, 0.69, 0, -0.68955106, 0, 0.024886977, -0.37165517, 0.7153585, 4.7307878)
 
-[node name="StartingKatana" parent="." unique_id=377406710 instance=ExtResource("6_dpcf1")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 5)
-
 [node name="CharacterBody3D" parent="." unique_id=1642102209 instance=ExtResource("7_jhdhk")]
 transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, -2.6646903, 0.7050867, 13.889074)
 
@@ -159,9 +156,13 @@ bones/71/rotation = Quaternion(-0.00028533273, 0.0071987933, 0.0071987873, 0.999
 transform = Transform3D(0.99979264, -0.014400934, 0.01439273, 0.014392718, 0.9998961, 0.0006742809, -0.014400946, -0.00046699066, 0.9998961, 0.4954469, 0.865964, 0.33012995)
 
 [node name="Player" parent="." unique_id=636244937 instance=ExtResource("1_x00a1")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.73468405, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8136023, 0)
+
+[node name="StartingKatana" parent="." unique_id=377406710 instance=ExtResource("6_dpcf1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9121969, 4.8046618)
 
 [editable path="Arena"]
 [editable path="Table"]
 [editable path="CharacterBody3D"]
 [editable path="CharacterBody3D/Psychopomp"]
+[editable path="StartingKatana"]

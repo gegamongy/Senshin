@@ -2,6 +2,7 @@ class_name WeaponBase
 extends Node3D
 
 @export var sheathe: MeshInstance3D #The Sheathe or Scabbard for the weapon
+@export var weapon_mesh: MeshInstance3D #The actual weapon mesh (blade)
 @export var weapon_data: WeaponData
 
 signal player_in_range
