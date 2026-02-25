@@ -156,7 +156,7 @@ bones/71/rotation = Quaternion(-0.00028533273, 0.0071987933, 0.0071987873, 0.999
 transform = Transform3D(0.99979264, -0.014400934, 0.01439273, 0.014392718, 0.9998961, 0.0006742809, -0.014400946, -0.00046699066, 0.9998961, 0.4954469, 0.865964, 0.33012995)
 
 [node name="Player" parent="." unique_id=636244937 instance=ExtResource("1_x00a1")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8136023, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7329552, 0)
 
 [node name="StartingKatana" parent="." unique_id=377406710 instance=ExtResource("6_dpcf1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.9121969, 4.8046618)

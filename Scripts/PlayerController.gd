@@ -209,21 +209,31 @@ func _on_sheathe_unsheathe_pressed():
 	# Check current state - only allow from idle or moving states
 	var current_state = player_state_machine.get_current_state_name()
 	if current_state not in ["GroundedIdle", "GroundedMoving"]:
-		print("[PlayerController] Cannot sheathe/unsheathe from state: ", current_state)
 		return
 	
+	# Check if player is moving
+	var is_moving = locomotion_component.get_input_magnitude() > 0.1
+	
 	if combat_component.is_armed:
-		# Unarm: Play sheathe animation first, then restore unarmed animations
-		print("[PlayerController] Unarming weapon...")
-		player_state_machine.change_state("Sheathe")
-		# The SheatheState will handle completion and call unarm_weapon
+		# Unarm: Play sheathe animation
+		if is_moving:
+			# Play sheathe animation while moving (oneshot layered over locomotion)
+			animation_controller.play_sheathe_moving()
+			# Note: unarm_weapon() will be called by animation event in the sheathe animation
+		else:
+			# Stop and play full sheathe animation
+			player_state_machine.change_state("Sheathe")
 	else:
 		# Arm: Swap to weapon animations first, then play unsheathe
-		print("[PlayerController] Arming weapon...")
 		if combat_component.arm_weapon(WeaponData.WeaponSlot.PRIMARY):
-			player_state_machine.change_state("Unsheathe")
-		else:
-			print("[PlayerController] Failed to arm weapon (no weapon equipped?)")
+			# Wait one frame for deferred animation assignments to complete
+			await get_tree().process_frame
+			if is_moving:
+				# Play unsheathe animation while moving (oneshot layered over locomotion)
+				animation_controller.play_unsheathe_moving()
+			else:
+				# Stop and play full unsheathe animation
+				player_state_machine.change_state("Unsheathe")
 
 
 #endregion
@@ -311,6 +321,13 @@ func arm_secondary_weapon() -> void:
 func unarm_secondary_weapon() -> void:
 	"""Forward animation event to InventoryManager"""
 	InventoryManager.unarm_secondary_weapon()
+
+
+func complete_sheathe() -> void:
+	"""Complete sheathe action - restore unarmed animations.
+	Called from animation event at the end of sheathe animations."""
+	if combat_component:
+		combat_component.unarm_weapon()
 
 
 #endregion

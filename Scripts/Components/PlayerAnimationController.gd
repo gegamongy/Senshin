@@ -147,46 +147,65 @@ func get_jump_start_duration(direction: float) -> float:
 
 func play_unsheathe() -> void:
 	"""Play unsheathe animation"""
-	print("[AnimController] play_unsheathe() called")
 	state_machine.travel("Combat")
-	print("[AnimController]   Traveled to Combat")
 	var combat_playback = animation_tree.get("parameters/Combat/playback") as AnimationNodeStateMachinePlayback
 	if combat_playback:
-		print("[AnimController]   Got Combat playback")
-		# Navigate to SheatheUnsheathe nested state machine
 		combat_playback.travel("SheatheUnsheathe")
-		print("[AnimController]   Traveled to SheatheUnsheathe")
 		var sheathe_playback = animation_tree.get("parameters/Combat/SheatheUnsheathe/playback") as AnimationNodeStateMachinePlayback
 		if sheathe_playback:
-			print("[AnimController]   Got SheatheUnsheathe playback")
 			sheathe_playback.travel("Unsheathe")
-			print("[AnimController]   Traveled to Unsheathe")
-		else:
-			print("[AnimController] Error: Could not get SheatheUnsheathe playback")
-	else:
-		print("[AnimController] Error: Could not get Combat playback")
 
 
 func play_sheathe() -> void:
 	"""Play sheathe animation"""
-	print("[AnimController] play_sheathe() called")
 	state_machine.travel("Combat")
-	print("[AnimController]   Traveled to Combat")
 	var combat_playback = animation_tree.get("parameters/Combat/playback") as AnimationNodeStateMachinePlayback
 	if combat_playback:
-		print("[AnimController]   Got Combat playback")
-		# Navigate to SheatheUnsheathe nested state machine
 		combat_playback.travel("SheatheUnsheathe")
-		print("[AnimController]   Traveled to SheatheUnsheathe")
 		var sheathe_playback = animation_tree.get("parameters/Combat/SheatheUnsheathe/playback") as AnimationNodeStateMachinePlayback
 		if sheathe_playback:
-			print("[AnimController]   Got SheatheUnsheathe playback")
 			sheathe_playback.travel("Sheathe")
-			print("[AnimController]   Traveled to Sheathe")
-		else:
-			print("[AnimController] Error: Could not get SheatheUnsheathe playback")
-	else:
-		print("[AnimController] Error: Could not get Combat playback")
+
+
+func play_unsheathe_moving() -> void:
+	"""Play unsheathe animation while moving (oneshot layered over locomotion)"""
+	# Wait one frame to ensure deferred animation assignments have completed
+	await animation_tree.get_tree().process_frame
+	
+	# Make sure we're in Grounded state
+	if state_machine.get_current_node() != "Grounded":
+		state_machine.travel("Grounded")
+	
+	# Check oneshot state and abort if still active
+	var oneshot_path = "parameters/Grounded/unsheathe/request"
+	var oneshot_active_path = "parameters/Grounded/unsheathe/active"
+	var is_active = animation_tree.get(oneshot_active_path)
+	
+	if is_active:
+		animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
+		await animation_tree.get_tree().process_frame
+	
+	# Trigger oneshot in Grounded BlendTree
+	animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+
+
+func play_sheathe_moving() -> void:
+	"""Play sheathe animation while moving (oneshot layered over locomotion)"""
+	# Make sure we're in Grounded state
+	if state_machine.get_current_node() != "Grounded":
+		state_machine.travel("Grounded")
+	
+	# Check oneshot state and abort if still active
+	var oneshot_path = "parameters/Grounded/sheathe/request"
+	var oneshot_active_path = "parameters/Grounded/sheathe/active"
+	var is_active = animation_tree.get(oneshot_active_path)
+	
+	if is_active:
+		animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
+		await animation_tree.get_tree().process_frame
+	
+	# Trigger oneshot in Grounded BlendTree
+	animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 
 
 func get_unsheathe_duration() -> float:
@@ -210,10 +229,8 @@ func get_unsheathe_duration() -> float:
 		
 		for anim_name in possible_names:
 			if anim_player.has_animation(anim_name):
-				print("[AnimController] Found unsheathe animation: ", anim_name, " duration: ", anim_player.get_animation(anim_name).length)
-				return anim_player.get_animation(anim_name).length
+						return anim_player.get_animation(anim_name).length
 	
-	print("[AnimController] Could not find unsheathe animation, using fallback duration")
 	return 1.0  # Fallback
 
 
@@ -238,10 +255,8 @@ func get_sheathe_duration() -> float:
 		
 		for anim_name in possible_names:
 			if anim_player.has_animation(anim_name):
-				print("[AnimController] Found sheathe animation: ", anim_name, " duration: ", anim_player.get_animation(anim_name).length)
 				return anim_player.get_animation(anim_name).length
 	
-	print("[AnimController] Could not find sheathe animation, using fallback duration")
 	return 1.0  # Fallback
 
 
@@ -369,43 +384,35 @@ func signed_angle_between(forward: Vector3, move_dir: Vector3) -> float:
 func swap_animation_library(anim_library: AnimationLibrary, weapon_type: String) -> void:
 	"""Swap grounded movement animations to weapon-specific ones"""
 	if is_using_weapon_anims:
-		print("[AnimController] Already using weapon animations")
 		return
 	
 	# Get AnimationPlayer
 	var anim_player = animation_tree.get_node(animation_tree.anim_player) as AnimationPlayer
 	if not anim_player:
-		print("[AnimController] Error: Could not get AnimationPlayer")
 		return
 	
 	# Determine library name
 	var library_name = _get_library_name_without_slash(weapon_type)
 	
 	# Add the weapon animation library to the AnimationPlayer
-	print("[AnimController] Adding animation library '", library_name, "' to AnimationPlayer")
 	if anim_player.has_animation_library(library_name):
-		print("[AnimController]   Library already exists, removing old one first")
 		anim_player.remove_animation_library(library_name)
 	
 	anim_player.add_animation_library(library_name, anim_library)
-	print("[AnimController]   Library added successfully")
 	
 	# Get the root state machine
 	var root_state_machine = animation_tree.tree_root as AnimationNodeStateMachine
 	if not root_state_machine:
-		print("[AnimController] Error: Could not get root state machine")
 		return
 	
 	# Get the Grounded BlendTree node
 	var grounded_blend_tree = root_state_machine.get_node("Grounded") as AnimationNodeBlendTree
 	if not grounded_blend_tree:
-		print("[AnimController] Error: Could not get Grounded blend tree")
 		return
 	
 	# Get the move BlendSpace1D node
 	var move_blend_space = grounded_blend_tree.get_node("move") as AnimationNodeBlendSpace1D
 	if not move_blend_space:
-		print("[AnimController] Error: Could not get move blend space")
 		return
 	
 	# Determine weapon-specific animation names
@@ -416,35 +423,28 @@ func swap_animation_library(anim_library: AnimationLibrary, weapon_type: String)
 	var new_walk = library_prefix + weapon_prefix + "WalkForward"
 	var new_run = library_prefix + weapon_prefix + "RunForward"
 	
-	print("[AnimController] Using library prefix: ", library_prefix)
-	
-	# Verify animations exist in the library
-	if not _verify_animations_exist([new_idle, new_walk, new_run]):
-		print("[AnimController] Warning: Some weapon animations not found, using fallbacks")
-		# Could implement fallback logic here
-	
 	# Swap each blend point's animation
 	_swap_blend_point_animation(move_blend_space, 0, new_idle)   # Idle at position 0.0
 	_swap_blend_point_animation(move_blend_space, 1, new_walk)   # Walk at position 0.5
 	_swap_blend_point_animation(move_blend_space, 2, new_run)    # Run at position 1.0
 	
-	# Also setup combat animations (sheathe/unsheathe)
+	# Setup combat animations (sheathe/unsheathe in Combat state machine)
 	_setup_combat_animations(root_state_machine, library_prefix + weapon_prefix)
 	
+	# Setup moving sheathe/unsheathe animations (oneshots in Grounded state for layering)
+	_setup_grounded_sheathe_animations(grounded_blend_tree, library_prefix + weapon_prefix)
+	
 	is_using_weapon_anims = true
-	print("[AnimController] Swapped to ", weapon_type, " animations")
 
 
 func restore_unarmed_animations() -> void:
 	"""Restore original unarmed animations"""
 	if not is_using_weapon_anims:
-		print("[AnimController] Already using unarmed animations")
 		return
 	
 	# Get AnimationPlayer
 	var anim_player = animation_tree.get_node(animation_tree.anim_player) as AnimationPlayer
 	if not anim_player:
-		print("[AnimController] Error: Could not get AnimationPlayer")
 		return
 	
 	# Remove all weapon animation libraries
@@ -454,7 +454,6 @@ func restore_unarmed_animations() -> void:
 			libraries_to_remove.append(lib_name)
 	
 	for lib_name in libraries_to_remove:
-		print("[AnimController] Removing animation library: ", lib_name)
 		anim_player.remove_animation_library(lib_name)
 	
 	# Get nodes (same process as swap_animation_library)
@@ -471,24 +470,23 @@ func restore_unarmed_animations() -> void:
 		return
 	
 	# Restore original unarmed animations
-	# Try both with and without library prefix to handle different setup scenarios
 	var base_lib_prefix = ""
 	
-	# Check if we need library prefix (anim_player already declared above)
+	# Check if we need library prefix
 	if anim_player:
 		if anim_player.has_animation("BaseUnarmedLibrary/" + unarmed_idle_anim):
 			base_lib_prefix = "BaseUnarmedLibrary/"
-			print("[AnimController] Using library prefix for unarmed animations")
 		elif anim_player.has_animation(unarmed_idle_anim):
 			base_lib_prefix = ""
-			print("[AnimController] Using no prefix for unarmed animations")
 	
 	_swap_blend_point_animation(move_blend_space, 0, base_lib_prefix + unarmed_idle_anim)
 	_swap_blend_point_animation(move_blend_space, 1, base_lib_prefix + unarmed_walk_anim)
 	_swap_blend_point_animation(move_blend_space, 2, base_lib_prefix + unarmed_run_anim)
 	
+	# Clear moving sheathe/unsheathe animations (oneshots in Grounded state)
+	_clear_grounded_sheathe_animations(grounded_blend_tree)
+	
 	is_using_weapon_anims = false
-	print("[AnimController] Restored unarmed animations")
 
 
 func _swap_blend_point_animation(blend_space: AnimationNodeBlendSpace1D, point_index: int, new_anim_name: StringName) -> void:
@@ -496,50 +494,64 @@ func _swap_blend_point_animation(blend_space: AnimationNodeBlendSpace1D, point_i
 	var anim_node = blend_space.get_blend_point_node(point_index) as AnimationNodeAnimation
 	if anim_node:
 		anim_node.animation = new_anim_name
-		print("[AnimController]   Point ", point_index, ": ", new_anim_name)
-	else:
-		print("[AnimController] Error: Could not get blend point ", point_index)
 
 
 func _setup_combat_animations(root_state_machine: AnimationNodeStateMachine, weapon_prefix: String) -> void:
 	"""Setup the sheathe/unsheathe animations in the Combat state machine"""
-	print("[AnimController] _setup_combat_animations called with weapon_prefix: ", weapon_prefix)
-	
 	# Get the Combat state machine
 	var combat_state_machine = root_state_machine.get_node("Combat") as AnimationNodeStateMachine
 	if not combat_state_machine:
-		print("[AnimController] ERROR: Combat state machine not found")
 		return
-	else:
-		print("[AnimController]   Found Combat state machine")
 	
 	# Get the SheatheUnsheathe nested state machine
 	var sheathe_state_machine = combat_state_machine.get_node("SheatheUnsheathe") as AnimationNodeStateMachine
 	if not sheathe_state_machine:
-		print("[AnimController] ERROR: SheatheUnsheathe state machine not found")
 		return
-	else:
-		print("[AnimController]   Found SheatheUnsheathe state machine")
 	
 	# Get and configure Unsheathe animation node
 	var unsheathe_node = sheathe_state_machine.get_node("Unsheathe") as AnimationNodeAnimation
 	if unsheathe_node:
-		var unsheathe_anim = weapon_prefix + "Unsheathe"
-		print("[AnimController]   Found Unsheathe node, setting animation to: ", unsheathe_anim)
-		unsheathe_node.animation = unsheathe_anim
-		print("[AnimController]   Unsheathe node.animation is now: ", unsheathe_node.animation)
-	else:
-		print("[AnimController] ERROR: Unsheathe animation node not found or wrong type")
+		unsheathe_node.animation = weapon_prefix + "Unsheathe"
 	
 	# Get and configure Sheathe animation node
 	var sheathe_node = sheathe_state_machine.get_node("Sheathe") as AnimationNodeAnimation
 	if sheathe_node:
-		var sheathe_anim = weapon_prefix + "Sheathe"
-		print("[AnimController]   Found Sheathe node, setting animation to: ", sheathe_anim)
-		sheathe_node.animation = sheathe_anim
-		print("[AnimController]   Sheathe node.animation is now: ", sheathe_node.animation)
+		sheathe_node.animation = weapon_prefix + "Sheathe"
+
+
+func _setup_grounded_sheathe_animations(grounded_blend_tree: AnimationNodeBlendTree, weapon_prefix: String) -> void:
+	"""Setup sheathe/unsheathe oneshot animations in Grounded state for moving arming/unarming.
+	These are layered over walk/run animations."""
+	print("[AnimController] ========= _setup_grounded_sheathe_animations called with weapon_prefix: ", weapon_prefix, " =========")
+	
+	# Get unsheathe oneshot node - use Running version for moving
+	var unsheathe_oneshot = grounded_blend_tree.get_node("unsheathe_anim") as AnimationNodeAnimation
+	if unsheathe_oneshot:
+		var unsheathe_anim = weapon_prefix + "UnsheatheRunning"
+		print("[AnimController]   Found unsheathe_anim node, setting animation to: ", unsheathe_anim)
+		# Use set_deferred to ensure AnimationTree processes the change properly
+		unsheathe_oneshot.set_deferred("animation", unsheathe_anim)
+		print("[AnimController]   Deferred set for unsheathe_anim to: ", unsheathe_anim)
 	else:
-		print("[AnimController] ERROR: Sheathe animation node not found or wrong type")
+		print("[AnimController] WARNING: unsheathe_anim oneshot node not found in Grounded BlendTree")
+	
+	# Get sheathe oneshot node - use Running version for moving
+	var sheathe_oneshot = grounded_blend_tree.get_node("sheathe_anim") as AnimationNodeAnimation
+	if sheathe_oneshot:
+		var sheathe_anim = weapon_prefix + "SheatheRunning"
+		print("[AnimController]   Found sheathe_anim node, setting animation to: ", sheathe_anim)
+		# Use set_deferred to ensure AnimationTree processes the change properly
+		sheathe_oneshot.set_deferred("animation", sheathe_anim)
+		print("[AnimController]   Deferred set for sheathe_anim to: ", sheathe_anim)
+	else:
+		print("[AnimController] WARNING: sheathe_anim oneshot node not found in Grounded BlendTree")
+	print("[AnimController] ========= _setup_grounded_sheathe_animations complete =========")
+
+
+func _clear_grounded_sheathe_animations(grounded_blend_tree: AnimationNodeBlendTree) -> void:
+	"""Leave sheathe/unsheathe oneshot animations set - they'll be inactive after library removal.
+	Note: We don't clear these to avoid AnimationTree cache issues."""
+	pass  # Intentionally empty - animation references stay set
 
 
 func _get_weapon_animation_prefix(weapon_type: String) -> String:
@@ -553,7 +565,6 @@ func _get_weapon_animation_prefix(weapon_type: String) -> String:
 		"spear":
 			return "Spear"
 		_:
-			print("[AnimController] Warning: Unknown weapon type '", weapon_type, "', using Katana")
 			return "Katana"
 
 
@@ -568,7 +579,6 @@ func _get_library_name(weapon_type: String) -> String:
 		"spear":
 			return "SpearAnimLibrary/"
 		_:
-			print("[AnimController] Warning: Unknown weapon type '", weapon_type, "', using KatanaAnimLibrary")
 			return "KatanaAnimLibrary/"
 
 
@@ -583,7 +593,6 @@ func _get_library_name_without_slash(weapon_type: String) -> String:
 		"spear":
 			return "SpearAnimLibrary"
 		_:
-			print("[AnimController] Warning: Unknown weapon type '", weapon_type, "', using KatanaAnimLibrary")
 			return "KatanaAnimLibrary"
 
 
@@ -593,13 +602,11 @@ func _verify_animations_exist(anim_names: Array) -> bool:
 	if not anim_player:
 		return false
 	
-	var all_exist = true
 	for anim_name in anim_names:
 		if not anim_player.has_animation(anim_name):
-			print("[AnimController] Warning: Animation '", anim_name, "' not found")
-			all_exist = false
+			return false
 	
-	return all_exist
+	return true
 
 
 #endregion

@@ -19,8 +19,29 @@ blend_point_2/pos = 1.0
 min_space = 0.0
 sync = true
 
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_2yjkm"]
+filter_enabled = true
+filters = ["..", "Player Armature/Skeleton3D:Chest Spine", "Player Armature/Skeleton3D:ElbowPole.L", "Player Armature/Skeleton3D:ElbowPole.R", "Player Armature/Skeleton3D:Hand.L", "Player Armature/Skeleton3D:Hand.R", "Player Armature/Skeleton3D:HandCtrl.L", "Player Armature/Skeleton3D:HandCtrl.R", "Player Armature/Skeleton3D:HandIK.L", "Player Armature/Skeleton3D:HandIK.R", "Player Armature/Skeleton3D:Head", "Player Armature/Skeleton3D:Index1.L", "Player Armature/Skeleton3D:Index1.R", "Player Armature/Skeleton3D:Index2.L", "Player Armature/Skeleton3D:Index2.R", "Player Armature/Skeleton3D:Index3.L", "Player Armature/Skeleton3D:Index3.R", "Player Armature/Skeleton3D:Katana Hand Bone", "Player Armature/Skeleton3D:Mid.3.L", "Player Armature/Skeleton3D:Mid.3.R", "Player Armature/Skeleton3D:Mid1.L", "Player Armature/Skeleton3D:Mid1.R", "Player Armature/Skeleton3D:Mid2.L", "Player Armature/Skeleton3D:Mid2.R", "Player Armature/Skeleton3D:Neck", "Player Armature/Skeleton3D:Pinkie1.L", "Player Armature/Skeleton3D:Pinkie1.R", "Player Armature/Skeleton3D:Pinkie2.L", "Player Armature/Skeleton3D:Pinkie2.R", "Player Armature/Skeleton3D:Pinkie3.L", "Player Armature/Skeleton3D:Pinkie3.R", "Player Armature/Skeleton3D:Ring1.L", "Player Armature/Skeleton3D:Ring1.R", "Player Armature/Skeleton3D:Ring2.L", "Player Armature/Skeleton3D:Ring2.R", "Player Armature/Skeleton3D:Ring3.L", "Player Armature/Skeleton3D:Ring3.R", "Player Armature/Skeleton3D:Sheathe Bone", "Player Armature/Skeleton3D:Spine", "Player Armature/Skeleton3D:collar.L", "Player Armature/Skeleton3D:collar.R", "Player Armature/Skeleton3D:forearm.L", "Player Armature/Skeleton3D:forearm.R", "Player Armature/Skeleton3D:thumb1.L", "Player Armature/Skeleton3D:thumb1.R", "Player Armature/Skeleton3D:thumb2.L", "Player Armature/Skeleton3D:thumb2.R", "Player Armature/Skeleton3D:thumb3.L", "Player Armature/Skeleton3D:thumb3.R", "Player Armature/Skeleton3D:upper_arm.L", "Player Armature/Skeleton3D:upper_arm.R"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_efkbr"]
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_hmwxe"]
+filter_enabled = true
+filters = ["..", "Player Armature/Skeleton3D:Chest Spine", "Player Armature/Skeleton3D:ElbowPole.L", "Player Armature/Skeleton3D:ElbowPole.R", "Player Armature/Skeleton3D:Hand.L", "Player Armature/Skeleton3D:Hand.R", "Player Armature/Skeleton3D:HandCtrl.L", "Player Armature/Skeleton3D:HandCtrl.R", "Player Armature/Skeleton3D:HandIK.L", "Player Armature/Skeleton3D:HandIK.R", "Player Armature/Skeleton3D:Head", "Player Armature/Skeleton3D:Index1.L", "Player Armature/Skeleton3D:Index1.R", "Player Armature/Skeleton3D:Index2.L", "Player Armature/Skeleton3D:Index2.R", "Player Armature/Skeleton3D:Index3.L", "Player Armature/Skeleton3D:Index3.R", "Player Armature/Skeleton3D:Katana Hand Bone", "Player Armature/Skeleton3D:Mid.3.L", "Player Armature/Skeleton3D:Mid.3.R", "Player Armature/Skeleton3D:Mid1.L", "Player Armature/Skeleton3D:Mid1.R", "Player Armature/Skeleton3D:Mid2.L", "Player Armature/Skeleton3D:Mid2.R", "Player Armature/Skeleton3D:Neck", "Player Armature/Skeleton3D:Pinkie1.L", "Player Armature/Skeleton3D:Pinkie1.R", "Player Armature/Skeleton3D:Pinkie2.L", "Player Armature/Skeleton3D:Pinkie2.R", "Player Armature/Skeleton3D:Pinkie3.L", "Player Armature/Skeleton3D:Pinkie3.R", "Player Armature/Skeleton3D:Ring1.L", "Player Armature/Skeleton3D:Ring1.R", "Player Armature/Skeleton3D:Ring2.L", "Player Armature/Skeleton3D:Ring2.R", "Player Armature/Skeleton3D:Ring3.L", "Player Armature/Skeleton3D:Ring3.R", "Player Armature/Skeleton3D:Root", "Player Armature/Skeleton3D:Sheathe Bone", "Player Armature/Skeleton3D:Spine", "Player Armature/Skeleton3D:collar.L", "Player Armature/Skeleton3D:collar.R", "Player Armature/Skeleton3D:forearm.L", "Player Armature/Skeleton3D:forearm.R", "Player Armature/Skeleton3D:thumb1.L", "Player Armature/Skeleton3D:thumb1.R", "Player Armature/Skeleton3D:thumb2.L", "Player Armature/Skeleton3D:thumb2.R", "Player Armature/Skeleton3D:thumb3.L", "Player Armature/Skeleton3D:thumb3.R", "Player Armature/Skeleton3D:upper_arm.L", "Player Armature/Skeleton3D:upper_arm.R"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_mh7ac"]
+
 [resource]
-graph_offset = Vector2(-567.3598, -11.519997)
+graph_offset = Vector2(-675.39136, 55.364937)
+nodes/output/position = Vector2(910, 140)
 nodes/move/node = SubResource("AnimationNodeBlendSpace1D_gpi6q")
-nodes/move/position = Vector2(-170, 150)
-node_connections = [&"output", 0, &"move"]
+nodes/move/position = Vector2(-460, 150)
+nodes/unsheathe/node = SubResource("AnimationNodeOneShot_hmwxe")
+nodes/unsheathe/position = Vector2(100, 70)
+nodes/sheathe/node = SubResource("AnimationNodeOneShot_2yjkm")
+nodes/sheathe/position = Vector2(670, 100)
+nodes/unsheathe_anim/node = SubResource("AnimationNodeAnimation_mh7ac")
+nodes/unsheathe_anim/position = Vector2(-320, 360)
+nodes/sheathe_anim/node = SubResource("AnimationNodeAnimation_efkbr")
+nodes/sheathe_anim/position = Vector2(180, 370)
+node_connections = [&"output", 0, &"sheathe", &"unsheathe", 0, &"move", &"unsheathe", 1, &"unsheathe_anim", &"sheathe", 0, &"unsheathe", &"sheathe", 1, &"sheathe_anim"]
