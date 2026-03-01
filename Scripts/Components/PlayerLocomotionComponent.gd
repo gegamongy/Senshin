@@ -26,6 +26,7 @@ var was_grounded: bool = true
 var is_turning_180: bool = false
 var jump_direction: float = 1.0  # 1.0 forward, -1.0 backward
 var pending_backflip_root_motion_disable: bool = false
+var is_strafing: bool = false  # Set by animation controller when in strafe mode
 
 # Movement
 var input_magnitude: float = 0.0
@@ -65,8 +66,8 @@ func process_locomotion(input_dir: Vector2, crouch_input: bool, delta: float) ->
 	# Update smoothed speed for animation selection
 	update_smoothed_speed(delta)
 	
-	# Check for 180 turns
-	if has_movement_input:
+	# Check for 180 turns (disabled when strafing)
+	if has_movement_input and not is_strafing:
 		move_dir = move_dir.normalized()
 		check_turn_angles(move_dir)
 	
@@ -131,11 +132,16 @@ func update_input_magnitude(input_dir: Vector2, crouch_input: bool, delta: float
 		target_magnitude *= 0.5
 	
 	input_magnitude = lerp(input_magnitude, target_magnitude, INPUT_ACCEL_SPEED * delta)
+	
+	# Clamp very small magnitudes to 0 to prevent stuck walk animation
+	if input_magnitude < 0.01:
+		input_magnitude = 0.0
 
 
 func handle_grounded_movement(has_movement: bool, move_dir: Vector3, delta: float) -> void:
 	"""Handle movement when on the ground - root motion is applied by animation controller"""
-	if has_movement and not is_turning_180:
+	# Don't auto-rotate when strafing - player faces lock-on target instead
+	if has_movement and not is_turning_180 and not is_strafing:
 		lerp_body_rotation(move_dir, delta)
 
 
@@ -226,6 +232,10 @@ func get_is_turning_180() -> bool:
 
 func set_is_turning_180(value: bool) -> void:
 	is_turning_180 = value
+
+
+func set_is_strafing(value: bool) -> void:
+	is_strafing = value
 
 
 func get_pending_backflip_root_motion_disable() -> bool:

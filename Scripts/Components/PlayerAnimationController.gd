@@ -16,6 +16,11 @@ var unarmed_walk_anim: StringName = &"WalkForward"
 var unarmed_run_anim: StringName = &"RunForward"
 var is_using_weapon_anims: bool = false
 
+	# Lock-on state
+var is_locked_on: bool = false
+var lock_on_target: Node3D = null
+var current_strafe_blend: Vector2 = Vector2.ZERO  # Track current strafe direction
+
 
 func _ready():
 	pass
@@ -51,7 +56,7 @@ func process_animation(delta: float) -> void:
 	apply_root_motion(delta)
 	
 	# Update animation blend parameters for Grounded state machine
-	animation_tree.set("parameters/Grounded/move/blend_position", locomotion.get_input_magnitude())
+	update_grounded_blend_parameters()
 
 
 #region Direct Animation Playback
@@ -63,6 +68,16 @@ func play_animation(anim_name: String) -> void:
 
 func play_grounded_movement() -> void:
 	"""Play the grounded movement blend space"""
+	# If we're already in Grounded state, check if a oneshot is active
+	if state_machine.get_current_node() == "Grounded":
+		# Check if either oneshot is active - don't interrupt them
+		var unsheathe_active = animation_tree.get("parameters/Grounded/unsheathe/active")
+		var sheathe_active = animation_tree.get("parameters/Grounded/sheathe/active")
+		
+		if unsheathe_active or sheathe_active:
+			print("[AnimController] Skipping grounded movement travel - oneshot is active")
+			return
+	
 	state_machine.travel("Grounded")
 	# Explicitly tell Grounded state machine to play move blend space
 	var grounded_playback = animation_tree.get("parameters/Grounded/playback") as AnimationNodeStateMachinePlayback
@@ -169,12 +184,15 @@ func play_sheathe() -> void:
 
 func play_unsheathe_moving() -> void:
 	"""Play unsheathe animation while moving (oneshot layered over locomotion)"""
-	# Wait one frame to ensure deferred animation assignments have completed
-	await animation_tree.get_tree().process_frame
+	print("[Oneshot] play_unsheathe_moving() called")
 	
-	# Make sure we're in Grounded state
-	if state_machine.get_current_node() != "Grounded":
-		state_machine.travel("Grounded")
+	# Verify we're in the Grounded state
+	var current_state = state_machine.get_current_node()
+	print("[Oneshot] Current AnimationTree state: ", current_state)
+	
+	if current_state != "Grounded":
+		print("[Oneshot] ERROR: Not in Grounded state! Oneshot won't work!")
+		return
 	
 	# Check oneshot state and abort if still active
 	var oneshot_path = "parameters/Grounded/unsheathe/request"
@@ -182,18 +200,31 @@ func play_unsheathe_moving() -> void:
 	var is_active = animation_tree.get(oneshot_active_path)
 	
 	if is_active:
+		print("[Oneshot] Unsheathe oneshot already active - aborting first")
 		animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
 		await animation_tree.get_tree().process_frame
 	
-	# Trigger oneshot in Grounded BlendTree
+	# Trigger oneshot (will layer over current movement animation)
+	print("[Oneshot] FIRING unsheathe oneshot")
 	animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	
+	# Verify it actually fired
+	await animation_tree.get_tree().process_frame
+	var did_fire = animation_tree.get(oneshot_active_path)
+	print("[Oneshot] Unsheathe oneshot active after fire: ", did_fire)
 
 
 func play_sheathe_moving() -> void:
 	"""Play sheathe animation while moving (oneshot layered over locomotion)"""
-	# Make sure we're in Grounded state
-	if state_machine.get_current_node() != "Grounded":
-		state_machine.travel("Grounded")
+	print("[Oneshot] play_sheathe_moving() called")
+	
+	# Verify we're in the Grounded state
+	var current_state = state_machine.get_current_node()
+	print("[Oneshot] Current AnimationTree state: ", current_state)
+	
+	if current_state != "Grounded":
+		print("[Oneshot] ERROR: Not in Grounded state! Oneshot won't work!")
+		return
 	
 	# Check oneshot state and abort if still active
 	var oneshot_path = "parameters/Grounded/sheathe/request"
@@ -201,11 +232,18 @@ func play_sheathe_moving() -> void:
 	var is_active = animation_tree.get(oneshot_active_path)
 	
 	if is_active:
+		print("[Oneshot] Sheathe oneshot already active - aborting first")
 		animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
 		await animation_tree.get_tree().process_frame
 	
-	# Trigger oneshot in Grounded BlendTree
+	# Trigger oneshot (will layer over current movement animation)
+	print("[Oneshot] FIRING sheathe oneshot")
 	animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	
+	# Verify it actually fired
+	await animation_tree.get_tree().process_frame
+	var did_fire = animation_tree.get(oneshot_active_path)
+	print("[Oneshot] Sheathe oneshot active after fire: ", did_fire)
 
 
 func get_unsheathe_duration() -> float:
@@ -260,6 +298,92 @@ func get_sheathe_duration() -> float:
 	return 1.0  # Fallback
 
 
+func update_grounded_blend_parameters() -> void:
+	"""Update blend parameters for grounded movement based on lock-on state"""
+	var input_magnitude = locomotion.get_input_magnitude()
+	
+	# Determine if we should use strafe mode
+	# Use strafe when: locked on AND moving slowly (walk speed)
+	var use_strafe = is_locked_on and input_magnitude <= 0.5
+	
+	# Update locomotion strafe state
+	locomotion.set_is_strafing(use_strafe)
+	
+	if use_strafe:
+		# Blend to strafe mode (position 1.0 in movement BlendSpace1D)
+		animation_tree.set("parameters/Grounded/movement/blend_position", 1.0)
+		
+		# Get world-space movement direction from locomotion
+		var move_dir = locomotion.get_move_dir()
+		
+		# Transform movement direction to CAMERA-local space
+		# This ensures consistent input: W = forward (camera forward), S = back, A/D = strafe
+		var camera_yaw = locomotion.camera_yaw
+		var camera_forward = Vector3.FORWARD.rotated(Vector3.UP, camera_yaw + PI)
+		var camera_right = Vector3.RIGHT.rotated(Vector3.UP, camera_yaw + PI)
+		camera_forward.y = 0
+		camera_right.y = 0
+		camera_forward = camera_forward.normalized()
+		camera_right = camera_right.normalized()
+		
+		# Project world movement onto camera axes
+		var forward_amount = move_dir.dot(camera_forward)
+		var right_amount = move_dir.dot(camera_right)
+		
+		# Create 2D blend position in camera space
+		var strafe_blend = Vector2(right_amount, forward_amount) * input_magnitude
+		animation_tree.set("parameters/Grounded/movement/1/blend_position", strafe_blend)
+		
+		# Store for rotation calculation
+		current_strafe_blend = strafe_blend
+		
+		# Debug output (uncomment if needed)
+		# if input_magnitude > 0.01:
+		# 	print("[AnimController] STRAFE mode - magnitude: ", input_magnitude, " blend: ", strafe_blend)
+	else:
+		# Blend to normal movement mode (position 0.0 in movement BlendSpace1D)
+		animation_tree.set("parameters/Grounded/movement/blend_position", 0.0)
+		
+		# Set normal movement magnitude (blend space at position 0)
+		animation_tree.set("parameters/Grounded/movement/0/blend_position", input_magnitude)
+		
+		# Clear strafe blend when not strafing
+		current_strafe_blend = Vector2.ZERO
+		
+		# Debug output (uncomment if needed)
+		# if input_magnitude > 0.01:
+		# 	print("[AnimController] NORMAL mode - magnitude: ", input_magnitude)
+
+
+func set_lock_on_target(target: Node3D) -> void:
+	"""Set the lock-on target and enable locked movement"""
+	lock_on_target = target
+	is_locked_on = target != null
+	print("[AnimController] Lock-on ", "enabled" if is_locked_on else "disabled")
+	
+	# Don't refresh AnimationTree here - it interrupts animations
+	# The strafe animations were already swapped when weapon was equipped
+	# AnimationTree will naturally pick them up when blend_position changes to strafe mode
+
+
+func clear_lock_on() -> void:
+	"""Clear lock-on target and return to normal movement"""
+	lock_on_target = null
+	is_locked_on = false
+	current_strafe_blend = Vector2.ZERO
+	
+	# Force reset to normal movement mode
+	locomotion.set_is_strafing(false)
+	animation_tree.set("parameters/Grounded/movement/blend_position", 0.0)
+	
+	print("[AnimController] Lock-on cleared")
+
+
+func get_strafe_blend() -> Vector2:
+	"""Get current strafe blend position (X = right/left, Y = forward/back)"""
+	return current_strafe_blend
+
+
 #endregion
 
 
@@ -272,16 +396,27 @@ func apply_root_motion(delta: float) -> void:
 	
 	var capped_delta = min(delta, 1.0 / 30.0)
 	var root_motion = animation_tree.get_root_motion_position()
-	var root_motion_velocity = character_body.global_transform.basis * (root_motion / capped_delta)
+	var root_motion_velocity: Vector3
 	
-	# During 180 turns, apply both position and rotation
+	# Apply rotation for 180 turns (strafe uses bone rotation, not root motion rotation)
 	if locomotion.get_is_turning_180():
+		root_motion_velocity = character_body.global_transform.basis * (root_motion / capped_delta)
 		var root_motion_rotation = animation_tree.get_root_motion_rotation()
 		var euler = root_motion_rotation.get_euler(EULER_ORDER_YXZ)
 		locomotion.apply_root_motion_rotation(-euler.z)
 		character_body.velocity.x = root_motion_velocity.x
 		character_body.velocity.z = root_motion_velocity.z
+	elif locomotion.is_strafing:
+		# Strafe mode: apply root motion relative to camera direction, not character direction
+		# This keeps movement consistent with input regardless of character orientation
+		var camera_basis = Basis()
+		camera_basis = camera_basis.rotated(Vector3.UP, locomotion.camera_yaw)
+		root_motion_velocity = camera_basis * (root_motion / capped_delta)
+		
+		character_body.velocity.x = root_motion_velocity.x
+		character_body.velocity.z = root_motion_velocity.z
 	else:
+		root_motion_velocity = character_body.global_transform.basis * (root_motion / capped_delta)
 		# Handle landing blend to prevent pause when landing
 		if locomotion.landing_frames > 0:
 			var blend_factor = float(locomotion.landing_frames) / 3.0
@@ -290,6 +425,8 @@ func apply_root_motion(delta: float) -> void:
 			locomotion.landing_frames -= 1
 		else:
 			# Normal movement - only apply position
+			character_body.velocity.x = root_motion_velocity.x
+			character_body.velocity.z = root_motion_velocity.z
 			character_body.velocity.x = root_motion_velocity.x
 			character_body.velocity.z = root_motion_velocity.z
 
@@ -302,6 +439,10 @@ func apply_root_motion(delta: float) -> void:
 func check_for_180_turn(move_dir: Vector3) -> bool:
 	"""Check if player should perform 180 turn and trigger animation. Returns true if turn started."""
 	if not locomotion.get_is_grounded() or locomotion.get_is_turning_180():
+		return false
+	
+	# Disable 180 turns when in strafe mode
+	if locomotion.is_strafing:
 		return false
 	
 	var player_forward = character_body.global_transform.basis.z
@@ -410,10 +551,31 @@ func swap_animation_library(anim_library: AnimationLibrary, weapon_type: String)
 	if not grounded_blend_tree:
 		return
 	
-	# Get the move BlendSpace1D node
-	var move_blend_space = grounded_blend_tree.get_node("move") as AnimationNodeBlendSpace1D
-	if not move_blend_space:
+	# Get the movement BlendSpace1D (parent of default_movement and walk_strafe)
+	var movement_blend = grounded_blend_tree.get_node("movement") as AnimationNodeBlendSpace1D
+	if not movement_blend:
 		return
+	
+	# Get the default_movement BlendSpace1D (nested inside movement at position 0)
+	var default_movement = movement_blend.get_blend_point_node(0) as AnimationNodeBlendSpace1D
+	if not default_movement:
+		return
+	
+	# Validate blend space setup
+	print("[AnimController] Validating blend space setup:")
+	print("  Blend point count: ", default_movement.get_blend_point_count())
+	for i in range(default_movement.get_blend_point_count()):
+		var pos = default_movement.get_blend_point_position(i)
+		var node = default_movement.get_blend_point_node(i) as AnimationNodeAnimation
+		if node:
+			print("  Point ", i, " @ position ", pos, ": ", node.animation)
+		else:
+			print("  Point ", i, " @ position ", pos, ": NO NODE")
+	
+	# Warn about unexpected blend points
+	if default_movement.get_blend_point_count() != 3:
+		print("[AnimController] WARNING: Expected 3 blend points (at 0.0, 0.5, 1.0), found ", default_movement.get_blend_point_count())
+		print("[AnimController] WARNING: Please fix your AnimationTree BlendSpace1D to have exactly 3 points!")
 	
 	# Determine weapon-specific animation names
 	var weapon_prefix = _get_weapon_animation_prefix(weapon_type)
@@ -423,10 +585,46 @@ func swap_animation_library(anim_library: AnimationLibrary, weapon_type: String)
 	var new_walk = library_prefix + weapon_prefix + "WalkForward"
 	var new_run = library_prefix + weapon_prefix + "RunForward"
 	
-	# Swap each blend point's animation
-	_swap_blend_point_animation(move_blend_space, 0, new_idle)   # Idle at position 0.0
-	_swap_blend_point_animation(move_blend_space, 1, new_walk)   # Walk at position 0.5
-	_swap_blend_point_animation(move_blend_space, 2, new_run)    # Run at position 1.0
+	print("[AnimController] Swapping animations:")
+	print("  Idle: ", new_idle)
+	print("  Walk: ", new_walk)
+	print("  Run: ", new_run)
+	
+	# List all available animations in the library
+	print("[AnimController] Available animations in ", library_name, ":")
+	for anim_name in anim_player.get_animation_list():
+		if anim_name.begins_with(library_name):
+			print("    ", anim_name)
+	
+	# Verify animations exist before swapping
+	if not anim_player.has_animation(new_idle):
+		print("[AnimController] WARNING: Animation not found: ", new_idle)
+	if not anim_player.has_animation(new_walk):
+		print("[AnimController] WARNING: Animation not found: ", new_walk)
+	if not anim_player.has_animation(new_run):
+		print("[AnimController] WARNING: Animation not found: ", new_run)
+	
+	# Swap each blend point's animation in default_movement
+	# Find the correct blend points by position, not by index
+	_swap_animation_by_position(default_movement, 0.0, new_idle)   # Idle at position 0.0
+	_swap_animation_by_position(default_movement, 0.5, new_walk)   # Walk at position 0.5
+	_swap_animation_by_position(default_movement, 1.0, new_run)    # Run at position 1.0
+	
+	# Get walk_strafe BlendSpace2D (nested inside movement at position 1)
+	var walk_strafe = movement_blend.get_blend_point_node(1) as AnimationNodeBlendSpace2D
+	if walk_strafe:
+		# Swap strafe animations if weapon has them
+		_swap_strafe_animations(walk_strafe, library_prefix + weapon_prefix)
+		
+		# Verify the animations were actually set
+		print("[AnimController] Verifying strafe animations after swap:")
+		for i in range(walk_strafe.get_blend_point_count()):
+			var pos = walk_strafe.get_blend_point_position(i)
+			var node = walk_strafe.get_blend_point_node(i) as AnimationNodeAnimation
+			if node:
+				print("  Point ", i, " @ ", pos, ": ", node.animation)
+	else:
+		print("[AnimController] ERROR: Could not get walk_strafe BlendSpace2D!")
 	
 	# Setup combat animations (sheathe/unsheathe in Combat state machine)
 	_setup_combat_animations(root_state_machine, library_prefix + weapon_prefix)
@@ -465,8 +663,14 @@ func restore_unarmed_animations() -> void:
 	if not grounded_blend_tree:
 		return
 	
-	var move_blend_space = grounded_blend_tree.get_node("move") as AnimationNodeBlendSpace1D
-	if not move_blend_space:
+	# Get the movement BlendSpace1D
+	var movement_blend = grounded_blend_tree.get_node("movement") as AnimationNodeBlendSpace1D
+	if not movement_blend:
+		return
+	
+	# Get the default_movement BlendSpace1D (nested inside movement at position 0)
+	var default_movement = movement_blend.get_blend_point_node(0) as AnimationNodeBlendSpace1D
+	if not default_movement:
 		return
 	
 	# Restore original unarmed animations
@@ -479,9 +683,39 @@ func restore_unarmed_animations() -> void:
 		elif anim_player.has_animation(unarmed_idle_anim):
 			base_lib_prefix = ""
 	
-	_swap_blend_point_animation(move_blend_space, 0, base_lib_prefix + unarmed_idle_anim)
-	_swap_blend_point_animation(move_blend_space, 1, base_lib_prefix + unarmed_walk_anim)
-	_swap_blend_point_animation(move_blend_space, 2, base_lib_prefix + unarmed_run_anim)
+	var restore_idle = base_lib_prefix + unarmed_idle_anim
+	var restore_walk = base_lib_prefix + unarmed_walk_anim
+	var restore_run = base_lib_prefix + unarmed_run_anim
+	
+	print("[AnimController] Restoring unarmed animations:")
+	print("  Idle: ", restore_idle)
+	print("  Walk: ", restore_walk)
+	print("  Run: ", restore_run)
+	
+	# Verify animations exist before restoring
+	if not anim_player.has_animation(restore_idle):
+		print("[AnimController] ERROR: Unarmed animation not found: ", restore_idle)
+	if not anim_player.has_animation(restore_walk):
+		print("[AnimController] ERROR: Unarmed animation not found: ", restore_walk)
+	if not anim_player.has_animation(restore_run):
+		print("[AnimController] ERROR: Unarmed animation not found: ", restore_run)
+	
+	_swap_animation_by_position(default_movement, 0.0, restore_idle)
+	_swap_animation_by_position(default_movement, 0.5, restore_walk)
+	_swap_animation_by_position(default_movement, 1.0, restore_run)
+	
+	# Restore unarmed strafe animations
+	var walk_strafe = movement_blend.get_blend_point_node(1) as AnimationNodeBlendSpace2D
+	if walk_strafe:
+		_restore_strafe_animations(walk_strafe, base_lib_prefix)
+		
+		# Verify the animations were actually restored
+		print("[AnimController] Verifying strafe animations after restore:")
+		for i in range(walk_strafe.get_blend_point_count()):
+			var pos = walk_strafe.get_blend_point_position(i)
+			var node = walk_strafe.get_blend_point_node(i) as AnimationNodeAnimation
+			if node:
+				print("  Point ", i, " @ ", pos, ": ", node.animation)
 	
 	# Clear moving sheathe/unsheathe animations (oneshots in Grounded state)
 	_clear_grounded_sheathe_animations(grounded_blend_tree)
@@ -493,7 +727,37 @@ func _swap_blend_point_animation(blend_space: AnimationNodeBlendSpace1D, point_i
 	"""Helper to swap the animation at a specific blend point"""
 	var anim_node = blend_space.get_blend_point_node(point_index) as AnimationNodeAnimation
 	if anim_node:
+		var old_anim = anim_node.animation
 		anim_node.animation = new_anim_name
+		print("[AnimController] Swapped blend point ", point_index, ": ", old_anim, " -> ", new_anim_name)
+	else:
+		print("[AnimController] ERROR: Could not get animation node at blend point ", point_index)
+
+
+func _swap_animation_by_position(blend_space: AnimationNodeBlendSpace1D, target_position: float, new_anim_name: StringName) -> void:
+	"""Find and swap animation at a specific blend position"""
+	var closest_index = -1
+	var closest_distance = 999999.0
+	
+	# Find the blend point closest to the target position
+	for i in range(blend_space.get_blend_point_count()):
+		var pos = blend_space.get_blend_point_position(i)
+		var distance = abs(pos - target_position)
+		if distance < closest_distance:
+			closest_distance = distance
+			closest_index = i
+	
+	if closest_index >= 0:
+		var anim_node = blend_space.get_blend_point_node(closest_index) as AnimationNodeAnimation
+		if anim_node:
+			var old_anim = anim_node.animation
+			var actual_pos = blend_space.get_blend_point_position(closest_index)
+			anim_node.animation = new_anim_name
+			print("[AnimController] Swapped blend point ", closest_index, " @ position ", actual_pos, ": ", old_anim, " -> ", new_anim_name)
+		else:
+			print("[AnimController] ERROR: Could not get animation node at blend point ", closest_index)
+	else:
+		print("[AnimController] ERROR: Could not find blend point near position ", target_position)
 
 
 func _setup_combat_animations(root_state_machine: AnimationNodeStateMachine, weapon_prefix: String) -> void:
@@ -524,34 +788,166 @@ func _setup_grounded_sheathe_animations(grounded_blend_tree: AnimationNodeBlendT
 	These are layered over walk/run animations."""
 	print("[AnimController] ========= _setup_grounded_sheathe_animations called with weapon_prefix: ", weapon_prefix, " =========")
 	
-	# Get unsheathe oneshot node - use Running version for moving
-	var unsheathe_oneshot = grounded_blend_tree.get_node("unsheathe_anim") as AnimationNodeAnimation
+	# Configure unsheathe oneshot blend settings
+	var unsheathe_oneshot = grounded_blend_tree.get_node("unsheathe") as AnimationNodeOneShot
 	if unsheathe_oneshot:
-		var unsheathe_anim = weapon_prefix + "UnsheatheRunning"
-		print("[AnimController]   Found unsheathe_anim node, setting animation to: ", unsheathe_anim)
-		# Use set_deferred to ensure AnimationTree processes the change properly
-		unsheathe_oneshot.set_deferred("animation", unsheathe_anim)
-		print("[AnimController]   Deferred set for unsheathe_anim to: ", unsheathe_anim)
+		unsheathe_oneshot.fadein_time = 0.1  # Quick fade in
+		unsheathe_oneshot.fadeout_time = 0.2  # Smooth fade out
+		unsheathe_oneshot.autorestart = false
+		unsheathe_oneshot.mix_mode = AnimationNodeOneShot.MIX_MODE_BLEND
+		unsheathe_oneshot.fadein_curve = null  # Linear blend
+		unsheathe_oneshot.fadeout_curve = null  # Linear blend
+		
+		# DISABLE filter - we want ALL tracks including call tracks to play
+		#unsheathe_oneshot.filter_enabled = false
+		
+		print("[AnimController] Configured unsheathe oneshot: fade_in=0.1, fade_out=0.2, BLEND mode, filter disabled (all tracks enabled)")
 	else:
-		print("[AnimController] WARNING: unsheathe_anim oneshot node not found in Grounded BlendTree")
+		print("[AnimController] WARNING: unsheathe oneshot node not found")
 	
-	# Get sheathe oneshot node - use Running version for moving
-	var sheathe_oneshot = grounded_blend_tree.get_node("sheathe_anim") as AnimationNodeAnimation
-	if sheathe_oneshot:
-		var sheathe_anim = weapon_prefix + "SheatheRunning"
-		print("[AnimController]   Found sheathe_anim node, setting animation to: ", sheathe_anim)
-		# Use set_deferred to ensure AnimationTree processes the change properly
-		sheathe_oneshot.set_deferred("animation", sheathe_anim)
-		print("[AnimController]   Deferred set for sheathe_anim to: ", sheathe_anim)
+	# Get the animation node for unsheathe (accessed separately from the blend tree)
+	var unsheathe_anim = grounded_blend_tree.get_node("unsheathe_anim") as AnimationNodeAnimation
+	if unsheathe_anim:
+		var unsheathe_anim_name = weapon_prefix + "UnsheatheRunning"
+		print("[AnimController]   Setting unsheathe_anim animation to: ", unsheathe_anim_name)
+		unsheathe_anim.animation = unsheathe_anim_name
 	else:
-		print("[AnimController] WARNING: sheathe_anim oneshot node not found in Grounded BlendTree")
+		print("[AnimController] WARNING: unsheathe_anim animation node not found in Grounded BlendTree")
+	
+	# Configure sheathe oneshot blend settings
+	var sheathe_oneshot = grounded_blend_tree.get_node("sheathe") as AnimationNodeOneShot
+	if sheathe_oneshot:
+		sheathe_oneshot.fadein_time = 0.1  # Quick fade in
+		sheathe_oneshot.fadeout_time = 0.2  # Smooth fade out
+		sheathe_oneshot.autorestart = false
+		sheathe_oneshot.mix_mode = AnimationNodeOneShot.MIX_MODE_BLEND
+		sheathe_oneshot.fadein_curve = null  # Linear blend
+		sheathe_oneshot.fadeout_curve = null  # Linear blend
+		
+		# DISABLE filter - we want ALL tracks including call tracks to play
+		#sheathe_oneshot.filter_enabled = false
+		
+		print("[AnimController] Configured sheathe oneshot: fade_in=0.1, fade_out=0.2, BLEND mode, filter disabled (all tracks enabled)")
+	else:
+		print("[AnimController] WARNING: sheathe oneshot node not found")
+	
+	# Get the animation node for sheathe (accessed separately from the blend tree)
+	var sheathe_anim = grounded_blend_tree.get_node("sheathe_anim") as AnimationNodeAnimation
+	if sheathe_anim:
+		var sheathe_anim_name = weapon_prefix + "SheatheRunning"
+		print("[AnimController]   Setting sheathe_anim animation to: ", sheathe_anim_name)
+		sheathe_anim.animation = sheathe_anim_name
+	else:
+		print("[AnimController] WARNING: sheathe_anim animation node not found in Grounded BlendTree")
+	
 	print("[AnimController] ========= _setup_grounded_sheathe_animations complete =========")
+
 
 
 func _clear_grounded_sheathe_animations(grounded_blend_tree: AnimationNodeBlendTree) -> void:
 	"""Leave sheathe/unsheathe oneshot animations set - they'll be inactive after library removal.
 	Note: We don't clear these to avoid AnimationTree cache issues."""
 	pass  # Intentionally empty - animation references stay set
+
+
+func _swap_strafe_animations(walk_strafe: AnimationNodeBlendSpace2D, weapon_prefix: String) -> void:
+	"""Swap strafe animations for weapon"""
+	print("[AnimController] Swapping strafe animations with weapon_prefix: ", weapon_prefix)
+	
+	if not walk_strafe:
+		print("[AnimController] ERROR: walk_strafe BlendSpace2D is null!")
+		return
+	
+	var blend_point_count = walk_strafe.get_blend_point_count()
+	print("[AnimController] BlendSpace2D has ", blend_point_count, " blend points")
+	
+	# Strafe animations: StrafeLeft, StrafeRight, StrafeBackward, WalkForward
+	# Try to find weapon-specific strafe animations, fallback to base if not found
+	var strafe_left = weapon_prefix + "StrafeWalkLeft"
+	var strafe_right = weapon_prefix + "StrafeWalkRight"
+	var strafe_back = weapon_prefix + "StrafeWalkBackward"
+	var strafe_forward = weapon_prefix + "WalkForward"  # Use regular walk forward
+	var strafe_idle = weapon_prefix + "Idle"  # Center point idle
+	
+	print("[AnimController] Target strafe animations:")
+	print("  Left: ", strafe_left)
+	print("  Right: ", strafe_right)
+	print("  Back: ", strafe_back)
+	print("  Forward: ", strafe_forward)
+	print("  Idle: ", strafe_idle)
+	
+	# Get animation points in BlendSpace2D and swap them
+	for i in range(blend_point_count):
+		var pos = walk_strafe.get_blend_point_position(i)
+		print("[AnimController] Strafe blend point ", i, " position: ", pos)
+		
+		var node = walk_strafe.get_blend_point_node(i) as AnimationNodeAnimation
+		if not node:
+			print("[AnimController] ERROR: Strafe blend point ", i, " is not an AnimationNodeAnimation!")
+			continue
+		
+		var old_anim = node.animation
+		print("[AnimController] Strafe blend point ", i, " current animation: ", old_anim)
+		
+		# Determine which strafe animation based on position
+		# Check which axis has the larger absolute value to determine direction
+		if abs(pos.x) > abs(pos.y):
+			# Horizontal movement (left/right)
+			if pos.x < 0:  # Left
+				node.animation = strafe_left
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (LEFT): ", old_anim, " -> ", strafe_left)
+			else:  # Right
+				node.animation = strafe_right
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (RIGHT): ", old_anim, " -> ", strafe_right)
+		elif abs(pos.y) > 0.01:
+			# Vertical movement (forward/back)
+			if pos.y < 0:  # Backward
+				node.animation = strafe_back
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (BACK): ", old_anim, " -> ", strafe_back)
+			else:  # Forward
+				node.animation = strafe_forward
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (FWD): ", old_anim, " -> ", strafe_forward)
+		else:
+			# Center point (0, 0) - idle animation during lock-on strafe
+			node.animation = strafe_idle
+			print("[AnimController] Strafe point ", i, " @ ", pos, " (CENTER/IDLE): ", old_anim, " -> ", strafe_idle)
+
+
+func _restore_strafe_animations(walk_strafe: AnimationNodeBlendSpace2D, base_prefix: String) -> void:
+	"""Restore unarmed strafe animations"""
+	print("[AnimController] Restoring unarmed strafe animations with base_prefix: ", base_prefix)
+	
+	# Restore base unarmed strafe animations
+	for i in range(walk_strafe.get_blend_point_count()):
+		var pos = walk_strafe.get_blend_point_position(i)
+		var node = walk_strafe.get_blend_point_node(i) as AnimationNodeAnimation
+		if not node:
+			continue
+		
+		var old_anim = node.animation
+		
+		# Determine which strafe animation based on position
+		# Check which axis has the larger absolute value to determine direction
+		if abs(pos.x) > abs(pos.y):
+			# Horizontal movement (left/right)
+			if pos.x < 0:  # Left
+				node.animation = base_prefix + "StrafeWalkLeft"
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (LEFT): ", old_anim, " -> ", base_prefix + "StrafeWalkLeft")
+			else:  # Right
+				node.animation = base_prefix + "StrafeWalkRight"
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (RIGHT): ", old_anim, " -> ", base_prefix + "StrafeWalkRight")
+		elif abs(pos.y) > 0.01:
+			# Vertical movement (forward/back)
+			if pos.y < 0:  # Backward
+				node.animation = base_prefix + "StrafeWalkBackward"
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (BACK): ", old_anim, " -> ", base_prefix + "StrafeWalkBackward")
+			else:  # Forward
+				node.animation = base_prefix + "WalkForward"
+				print("[AnimController] Strafe point ", i, " @ ", pos, " (FWD): ", old_anim, " -> ", base_prefix + "WalkForward")
+		else:
+			# Center point (0, 0) - idle animation
+			node.animation = base_prefix + "Idle"
+			print("[AnimController] Strafe point ", i, " @ ", pos, " (CENTER/IDLE): ", old_anim, " -> ", base_prefix + "Idle")
 
 
 func _get_weapon_animation_prefix(weapon_type: String) -> String:

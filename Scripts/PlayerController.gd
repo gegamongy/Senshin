@@ -13,10 +13,15 @@ var locomotion_component: PlayerLocomotionComponent
 var combat_component: PlayerCombatComponent
 var animation_controller: PlayerAnimationController
 var camera_controller: CameraController
+var lock_on_component: PlayerLockOnComponent
 var player_state_machine: StateMachine
 
 # Pickup tracking
 var nearby_pickups: Array[WeaponBase] = []
+
+# Sheathe/unsheathe state
+var is_sheathe_action_in_progress: bool = false
+var pending_delayed_operation: bool = false  # Track if there's a delayed unarm/unsheathe in progress
 
 
 func _ready():
@@ -35,6 +40,7 @@ func setup_components():
 	combat_component = PlayerCombatComponent.new()
 	animation_controller = PlayerAnimationController.new()
 	camera_controller = CameraController.new()
+	lock_on_component = PlayerLockOnComponent.new()
 	
 	# Add as children
 	add_child(input_component)
@@ -42,12 +48,14 @@ func setup_components():
 	add_child(combat_component)
 	add_child(animation_controller)
 	add_child(camera_controller)
+	add_child(lock_on_component)
 	
 	# Initialize components with required references
 	locomotion_component.initialize(self)
 	animation_controller.initialize(animation_tree, self, locomotion_component)
 	combat_component.initialize(animation_controller)
 	camera_controller.initialize(camera_pivot, camera, self, input_component)
+	lock_on_component.initialize(self, camera)
 	
 	# Setup state machine
 	setup_state_machine()
@@ -58,6 +66,11 @@ func setup_components():
 	input_component.pickup_pressed.connect(_on_pickup_pressed)
 	input_component.inventory_toggled.connect(_on_inventory_toggled)
 	input_component.sheathe_unsheathe_pressed.connect(_on_sheathe_unsheathe_pressed)
+	input_component.lock_on_toggled.connect(_on_lock_on_toggled)
+	
+	# Connect lock-on signals
+	lock_on_component.lock_on_acquired.connect(_on_lock_on_acquired)
+	lock_on_component.lock_on_lost.connect(_on_lock_on_lost)
 
 
 func setup_state_machine():
@@ -151,6 +164,30 @@ func _physics_process(delta):
 	# Process gamepad look input
 	input_component.process_gamepad_look(delta)
 	
+	# Update lock-on state
+	lock_on_component.update_lock_on(delta)
+	
+	# Orient character based on strafe direction when strafing
+	if lock_on_component.is_target_locked() and locomotion_component.is_strafing:
+		var strafe_blend = animation_controller.get_strafe_blend()
+		
+		if strafe_blend.length() > 0.01:
+			# Get camera yaw
+			var camera_yaw = camera_controller.get_camera_yaw()
+			
+			# Calculate target rotation based on strafe direction
+			# strafe_blend.x = right/left, strafe_blend.y = forward/back
+			# Use atan2 to smoothly handle all directions including diagonals
+			var strafe_angle = atan2(-strafe_blend.x, abs(strafe_blend.y))  # Left/right strafing affects angle, forward/back does not
+				# Note: we negate strafe_blend.x because right input should rotate character to the right (positive angle)
+			
+			# Combine camera yaw with strafe angle
+			# Camera faces the direction, character rotates based on strafe
+			var target_rotation = camera_yaw + strafe_angle
+			
+			# Smoothly rotate character
+			rotation.y = lerp_angle(rotation.y, target_rotation, 15.0 * delta)
+	
 	# Process locomotion (movement, gravity, jumping)
 	var input_dir = input_component.get_input_direction()
 	var crouch_input = input_component.is_crouching()
@@ -202,6 +239,11 @@ func _on_inventory_toggled():
 
 func _on_sheathe_unsheathe_pressed():
 	"""Handle sheathe/unsheathe button press"""
+	# Prevent spam - don't allow new action if one is already in progress
+	if is_sheathe_action_in_progress:
+		print("[Sheathe] BLOCKED: Action already in progress")
+		return
+	
 	# Check if player is grounded and not in middle of action
 	if not locomotion_component.get_is_grounded():
 		return
@@ -211,29 +253,91 @@ func _on_sheathe_unsheathe_pressed():
 	if current_state not in ["GroundedIdle", "GroundedMoving"]:
 		return
 	
-	# Check if player is moving
-	var is_moving = locomotion_component.get_input_magnitude() > 0.1
+	# Check if player is moving RIGHT NOW - this determines our path
+	var has_motion = locomotion_component.get_input_magnitude() > 0.1
+	print("[Sheathe] has_motion: ", has_motion, " | is_armed: ", combat_component.is_armed)
+	
+	# Cancel any pending delayed operations from previous toggle
+	if pending_delayed_operation:
+		print("[Sheathe] Cancelling previous delayed operation")
+		pending_delayed_operation = false
+	
+	is_sheathe_action_in_progress = true
 	
 	if combat_component.is_armed:
-		# Unarm: Play sheathe animation
-		if is_moving:
-			# Play sheathe animation while moving (oneshot layered over locomotion)
+		# === UNARMING ===
+		if has_motion:
+			# Continue grounded state, fire sheathe oneshot
+			print("[Sheathe] → Unarming with motion (oneshot)")
 			animation_controller.play_sheathe_moving()
-			# Note: unarm_weapon() will be called by animation event in the sheathe animation
+			
+			# Start async task to swap animations after oneshot completes
+			_delayed_unarm_weapon()
+			
+			# Clear flag immediately so player can move
+			is_sheathe_action_in_progress = false
 		else:
-			# Stop and play full sheathe animation
+			# Stop and travel to Combat->Sheathe state
+			print("[Sheathe] → Unarming idle (state transition)")
 			player_state_machine.change_state("Sheathe")
+			is_sheathe_action_in_progress = false
 	else:
-		# Arm: Swap to weapon animations first, then play unsheathe
+		# === ARMING ===
 		if combat_component.arm_weapon(WeaponData.WeaponSlot.PRIMARY):
-			# Wait one frame for deferred animation assignments to complete
-			await get_tree().process_frame
-			if is_moving:
-				# Play unsheathe animation while moving (oneshot layered over locomotion)
-				animation_controller.play_unsheathe_moving()
+			if has_motion:
+				# Continue grounded state, fire unsheathe oneshot
+				print("[Sheathe] → Arming with motion (oneshot)")
+				
+				# Start async task to fire oneshot after AnimationTree updates
+				_delayed_unsheathe()
+				
+				# Clear flag immediately so player can move
+				is_sheathe_action_in_progress = false
 			else:
-				# Stop and play full unsheathe animation
+				# Stop and travel to Combat->Unsheathe state
+				print("[Sheathe] → Arming idle (state transition)")
 				player_state_machine.change_state("Unsheathe")
+				is_sheathe_action_in_progress = false
+		else:
+			is_sheathe_action_in_progress = false
+
+
+#endregion
+
+
+func _delayed_unsheathe() -> void:
+	"""Async helper: Wait one frame then fire unsheathe oneshot (doesn't block input)"""
+	pending_delayed_operation = true
+	
+	await get_tree().process_frame
+	
+	# Check if operation was cancelled (player toggled again)
+	if not pending_delayed_operation:
+		print("[Sheathe] Delayed unsheathe cancelled")
+		return
+	
+	print("[Sheathe] AnimationTree updated, firing oneshot")
+	animation_controller.play_unsheathe_moving()
+	pending_delayed_operation = false
+
+
+func _delayed_unarm_weapon() -> void:
+	"""Async helper: Wait for sheathe animation then swap back to unarmed (doesn't block input)"""
+	pending_delayed_operation = true
+	
+	var duration = animation_controller.get_sheathe_duration()
+	print("[Sheathe] Waiting ", duration, " seconds for oneshot to complete")
+	await get_tree().create_timer(duration * 0.8).timeout  # Wait 80% to blend out smoothly
+	
+	# Check if operation was cancelled (player toggled again)
+	if not pending_delayed_operation:
+		print("[Sheathe] Delayed unarm cancelled")
+		return
+	
+	# Unarm the weapon (swap back to unarmed animations)
+	combat_component.unarm_weapon()
+	print("[Sheathe] → Unarmed")
+	pending_delayed_operation = false
 
 
 #endregion
@@ -329,5 +433,31 @@ func complete_sheathe() -> void:
 	if combat_component:
 		combat_component.unarm_weapon()
 
+
+#region Lock-On Signal Handlers
+
+func _on_lock_on_toggled() -> void:
+	"""Handle lock-on toggle input from input component"""
+	if lock_on_component:
+		lock_on_component.toggle_lock_on()
+
+
+func _on_lock_on_acquired(target: Node3D) -> void:
+	"""Handle lock-on acquisition - update animation controller and camera"""
+	if animation_controller:
+		animation_controller.set_lock_on_target(target)
+	if camera_controller:
+		camera_controller.set_lock_on_target(target)
+
+
+func _on_lock_on_lost() -> void:
+	"""Handle lock-on lost - clear animation controller and camera lock-on state"""
+	if animation_controller:
+		animation_controller.clear_lock_on()
+	if camera_controller:
+		camera_controller.clear_lock_on()
+
+
+#endregion
 
 #endregion

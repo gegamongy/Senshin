@@ -1,0 +1,9 @@
+[gd_resource type="AnimationNodeBlendTree" format=3 uid="uid://44mnpacnhykk"]
+
+[ext_resource type="AnimationNodeBlendSpace1D" uid="uid://dj44bsy6jpjb2" path="res://AnimationLibraries/BasicMovementBlendSpace1D.tres" id="1_i3500"]
+
+[resource]
+graph_offset = Vector2(-486.1905, -67.66782)
+nodes/output/position = Vector2(910, 140)
+nodes/default_move/node = ExtResource("1_i3500")
+nodes/default_move/position = Vector2(520, 300)

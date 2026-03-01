@@ -1,0 +1,24 @@
+[gd_resource type="AnimationNodeBlendSpace1D" format=3 uid="uid://dj44bsy6jpjb2"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_382d2"]
+animation = &"Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_xyqy2"]
+animation = &"Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_wml7y"]
+animation = &"RunForward"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_w5e3t"]
+animation = &"WalkForward"
+
+[resource]
+blend_point_0/node = SubResource("AnimationNodeAnimation_382d2")
+blend_point_0/pos = -1.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_xyqy2")
+blend_point_1/pos = 0.0
+blend_point_2/node = SubResource("AnimationNodeAnimation_wml7y")
+blend_point_2/pos = 1.0
+blend_point_3/node = SubResource("AnimationNodeAnimation_w5e3t")
+blend_point_3/pos = 0.5
+min_space = 0.0

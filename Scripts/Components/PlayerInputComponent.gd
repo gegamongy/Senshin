@@ -8,6 +8,7 @@ signal jump_released
 signal pickup_pressed
 signal inventory_toggled
 signal sheathe_unsheathe_pressed
+signal lock_on_toggled
 
 var input_dir: Vector2 = Vector2.ZERO
 var mouse_captured: bool = false
@@ -48,6 +49,10 @@ func process_input(event: InputEvent) -> void:
 	# Sheathe/Unsheathe
 	if event.is_action_pressed("sheathe_unsheathe"):
 		sheathe_unsheathe_pressed.emit()
+	
+	# Lock-on toggle
+	if event.is_action_pressed("lock_on"):
+		lock_on_toggled.emit()
 	
 	# Pickup
 	if event.is_action_pressed("pickup"):
