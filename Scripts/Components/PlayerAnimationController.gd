@@ -182,6 +182,80 @@ func play_sheathe() -> void:
 			sheathe_playback.travel("Sheathe")
 
 
+func play_light_attack_grounded(attack_index: int) -> void:
+	"""Play a grounded light attack (1-6) in the Combat state"""
+	if attack_index < 1 or attack_index > 6:
+		print("[AnimController] ERROR: Invalid attack index: ", attack_index)
+		return
+	
+	# Travel to Combat state
+	state_machine.travel("Combat")
+	
+	# Navigate to LightAttacks state machine
+	var combat_playback = animation_tree.get("parameters/Combat/playback") as AnimationNodeStateMachinePlayback
+	if combat_playback:
+		combat_playback.travel("LightAttacks")
+		
+		# Play the specific attack animation
+		var light_attacks_playback = animation_tree.get("parameters/Combat/LightAttacks/playback") as AnimationNodeStateMachinePlayback
+		if light_attacks_playback:
+			var attack_name = "LightAttack" + str(attack_index)
+			light_attacks_playback.travel(attack_name)
+			print("[AnimController] Playing grounded attack: ", attack_name)
+			
+			# Start async task to return to Grounded state after attack completes
+			_auto_return_to_grounded(attack_index)
+
+
+func _auto_return_to_grounded(attack_index: int) -> void:
+	"""Automatically return to Grounded state after attack animation completes"""
+	# Wait for animation to complete (use a fixed duration for simplicity)
+	# Most attack animations are ~1 second, wait 0.8 seconds to allow some overlap
+	await animation_tree.get_tree().create_timer(0.8).timeout
+	
+	# Only transition back if we're still in Combat state
+	if state_machine.get_current_node() == "Combat":
+		print("[AnimController] Attack completed - returning to Grounded")
+		state_machine.travel("Grounded")
+
+
+func play_light_attack_airborne(attack_index: int) -> void:
+	"""Play an airborne light attack by updating the animation and firing the oneshot"""
+	if attack_index < 1 or attack_index > 6:
+		print("[AnimController] ERROR: Invalid attack index: ", attack_index)
+		return
+	
+	# Get the root state machine
+	var root_state_machine = animation_tree.tree_root as AnimationNodeStateMachine
+	if not root_state_machine:
+		return
+	
+	# Get the Airborne state
+	var airborne_state = root_state_machine.get_node("Airborne") as AnimationNodeStateMachine
+	if not airborne_state:
+		return
+	
+	# Get the JumpMidair BlendTree
+	var jump_midair_blend = airborne_state.get_node("JumpMidair") as AnimationNodeBlendTree
+	if not jump_midair_blend:
+		return
+	
+	# Update the light attack animation node to the correct attack
+	var light_attack_anim = jump_midair_blend.get_node("light_attack_anim") as AnimationNodeAnimation
+	if light_attack_anim and is_using_weapon_anims:
+		# Get current weapon prefix from the animation name
+		var current_anim = light_attack_anim.animation
+		var weapon_prefix = current_anim.substr(0, current_anim.rfind("LightAttack"))
+		var new_attack_anim = weapon_prefix + "LightAttack" + str(attack_index)
+		light_attack_anim.animation = new_attack_anim
+		print("[AnimController] Set airborne attack to: ", new_attack_anim)
+	
+	# Fire the oneshot
+	var oneshot_path = "parameters/Airborne/JumpMidair/light_attack/request"
+	animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+	print("[AnimController] Fired airborne light attack oneshot")
+
+
 func play_unsheathe_moving() -> void:
 	"""Play unsheathe animation while moving (oneshot layered over locomotion)"""
 	print("[Oneshot] play_unsheathe_moving() called")
@@ -629,6 +703,9 @@ func swap_animation_library(anim_library: AnimationLibrary, weapon_type: String)
 	# Setup combat animations (sheathe/unsheathe in Combat state machine)
 	_setup_combat_animations(root_state_machine, library_prefix + weapon_prefix)
 	
+	# Setup airborne light attack animation
+	_setup_airborne_attack_animation(root_state_machine, library_prefix + weapon_prefix)
+	
 	# Setup moving sheathe/unsheathe animations (oneshots in Grounded state for layering)
 	_setup_grounded_sheathe_animations(grounded_blend_tree, library_prefix + weapon_prefix)
 	
@@ -761,26 +838,81 @@ func _swap_animation_by_position(blend_space: AnimationNodeBlendSpace1D, target_
 
 
 func _setup_combat_animations(root_state_machine: AnimationNodeStateMachine, weapon_prefix: String) -> void:
-	"""Setup the sheathe/unsheathe animations in the Combat state machine"""
+	"""Setup the sheathe/unsheathe and light attack animations in the Combat state machine"""
 	# Get the Combat state machine
 	var combat_state_machine = root_state_machine.get_node("Combat") as AnimationNodeStateMachine
 	if not combat_state_machine:
+		print("[AnimController] WARNING: Combat state machine not found")
 		return
 	
-	# Get the SheatheUnsheathe nested state machine
+	# === Setup Sheathe/Unsheathe ===
 	var sheathe_state_machine = combat_state_machine.get_node("SheatheUnsheathe") as AnimationNodeStateMachine
-	if not sheathe_state_machine:
+	if sheathe_state_machine:
+		# Get and configure Unsheathe animation node
+		var unsheathe_node = sheathe_state_machine.get_node("Unsheathe") as AnimationNodeAnimation
+		if unsheathe_node:
+			unsheathe_node.animation = weapon_prefix + "Unsheathe"
+		
+		# Get and configure Sheathe animation node
+		var sheathe_node = sheathe_state_machine.get_node("Sheathe") as AnimationNodeAnimation
+		if sheathe_node:
+			sheathe_node.animation = weapon_prefix + "Sheathe"
+	
+	# === Setup Light Attacks ===
+	var light_attacks_state = combat_state_machine.get_node("LightAttacks") as AnimationNodeStateMachine
+	if light_attacks_state:
+		print("[AnimController] Setting up light attack animations...")
+		
+		# Set up all 6 light attack animation nodes
+		for i in range(1, 7):  # 1 through 6
+			var attack_node_name = "LightAttack" + str(i)
+			var attack_node = light_attacks_state.get_node(attack_node_name) as AnimationNodeAnimation
+			if attack_node:
+				var attack_anim_name = weapon_prefix + "LightAttack" + str(i)
+				attack_node.animation = attack_anim_name
+				print("[AnimController]   ", attack_node_name, " -> ", attack_anim_name)
+			else:
+				print("[AnimController] WARNING: ", attack_node_name, " node not found")
+	else:
+		print("[AnimController] WARNING: LightAttacks state machine not found")
+
+
+func _setup_airborne_attack_animation(root_state_machine: AnimationNodeStateMachine, weapon_prefix: String) -> void:
+	"""Setup the airborne light attack oneshot animation"""
+	# Get the Airborne state machine
+	var airborne_state = root_state_machine.get_node("Airborne") as AnimationNodeStateMachine
+	if not airborne_state:
+		print("[AnimController] WARNING: Airborne state machine not found")
 		return
 	
-	# Get and configure Unsheathe animation node
-	var unsheathe_node = sheathe_state_machine.get_node("Unsheathe") as AnimationNodeAnimation
-	if unsheathe_node:
-		unsheathe_node.animation = weapon_prefix + "Unsheathe"
+	# Get the JumpMidair BlendTree (which contains the oneshot)
+	var jump_midair_blend = airborne_state.get_node("JumpMidair") as AnimationNodeBlendTree
+	if not jump_midair_blend:
+		print("[AnimController] WARNING: JumpMidair BlendTree not found - might still be an Animation node")
+		# If JumpMidair is not a BlendTree yet, skip airborne attack setup
+		return
 	
-	# Get and configure Sheathe animation node
-	var sheathe_node = sheathe_state_machine.get_node("Sheathe") as AnimationNodeAnimation
-	if sheathe_node:
-		sheathe_node.animation = weapon_prefix + "Sheathe"
+	# Try to get the light attack oneshot - it might not exist yet
+	var light_attack_oneshot = jump_midair_blend.get_node("light_attack") as AnimationNodeOneShot
+	if light_attack_oneshot:
+		light_attack_oneshot.fadein_time = 0.1
+		light_attack_oneshot.fadeout_time = 0.2
+		light_attack_oneshot.autorestart = false
+		light_attack_oneshot.mix_mode = AnimationNodeOneShot.MIX_MODE_BLEND
+		light_attack_oneshot.filter_enabled = false  # Allow all tracks (or enable for upper body only)
+		print("[AnimController] Configured airborne light_attack oneshot")
+	else:
+		print("[AnimController] WARNING: light_attack oneshot not found in JumpMidair - you need to add it to the BlendTree")
+		return
+	
+	# Try to get the light attack animation node
+	var light_attack_anim = jump_midair_blend.get_node("light_attack_anim") as AnimationNodeAnimation
+	if light_attack_anim:
+		var attack_anim_name = weapon_prefix + "LightAttack1"
+		light_attack_anim.animation = attack_anim_name
+		print("[AnimController] Set airborne attack animation to: ", attack_anim_name)
+	else:
+		print("[AnimController] WARNING: light_attack_anim node not found in JumpMidair - you need to add it to the BlendTree")
 
 
 func _setup_grounded_sheathe_animations(grounded_blend_tree: AnimationNodeBlendTree, weapon_prefix: String) -> void:

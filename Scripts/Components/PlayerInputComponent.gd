@@ -9,6 +9,7 @@ signal pickup_pressed
 signal inventory_toggled
 signal sheathe_unsheathe_pressed
 signal lock_on_toggled
+signal light_attack_pressed
 
 var input_dir: Vector2 = Vector2.ZERO
 var mouse_captured: bool = false
@@ -53,6 +54,10 @@ func process_input(event: InputEvent) -> void:
 	# Lock-on toggle
 	if event.is_action_pressed("lock_on"):
 		lock_on_toggled.emit()
+	
+	# Light attack
+	if event.is_action_pressed("light_attack"):
+		light_attack_pressed.emit()
 	
 	# Pickup
 	if event.is_action_pressed("pickup"):

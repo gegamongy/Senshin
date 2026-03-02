@@ -67,6 +67,7 @@ func setup_components():
 	input_component.inventory_toggled.connect(_on_inventory_toggled)
 	input_component.sheathe_unsheathe_pressed.connect(_on_sheathe_unsheathe_pressed)
 	input_component.lock_on_toggled.connect(_on_lock_on_toggled)
+	input_component.light_attack_pressed.connect(_on_light_attack_pressed)
 	
 	# Connect lock-on signals
 	lock_on_component.lock_on_acquired.connect(_on_lock_on_acquired)
@@ -302,6 +303,30 @@ func _on_sheathe_unsheathe_pressed():
 			is_sheathe_action_in_progress = false
 
 
+func _on_light_attack_pressed():
+	"""Handle light attack button press"""
+	# Can only attack when armed
+	if not combat_component.can_attack():
+		print("[Combat] Cannot attack - weapon not armed")
+		return
+	
+	# Get next attack index based on current pattern
+	var attack_index = combat_component.get_next_light_attack_index() + 1  # Convert 0-based to 1-based
+	
+	# Check if airborne or grounded
+	if locomotion_component.get_is_grounded():
+		# Grounded attack - travel to Combat state
+		print("[Combat] Grounded light attack: ", attack_index)
+		animation_controller.play_light_attack_grounded(attack_index)
+	else:
+		# Airborne attack - fire oneshot
+		print("[Combat] Airborne light attack: ", attack_index)
+		animation_controller.play_light_attack_airborne(attack_index)
+	
+	# Advance combo
+	combat_component.advance_combo()
+
+
 #endregion
 
 
@@ -353,6 +378,11 @@ func equip_weapon_data(weapon_data: WeaponData) -> void:
 func unequip_weapon_slot(slot: WeaponData.WeaponSlot) -> void:
 	"""Called by InventoryManager when a weapon is unequipped"""
 	combat_component.unequip_weapon(slot)
+
+
+func set_attack_pattern(pattern: PlayerCombatComponent.AttackPattern) -> void:
+	"""Change the light attack pattern (Sequential, Random, or Hybrid)"""
+	combat_component.set_attack_pattern(pattern)
 
 
 #endregion

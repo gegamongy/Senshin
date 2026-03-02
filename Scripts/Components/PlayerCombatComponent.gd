@@ -12,6 +12,12 @@ signal block_ended
 signal weapon_armed(weapon_data: WeaponData)
 signal weapon_unarmed
 
+enum AttackPattern {
+	SEQUENTIAL,  # 1->2->3->4->5->6, resets on timeout
+	RANDOM,      # Completely random attacks
+	HYBRID       # Sequential first time, then random
+}
+
 # Equipped weapons (data references)
 var equipped_primary_weapon: WeaponData = null
 var equipped_secondary_weapon: WeaponData = null
@@ -22,6 +28,15 @@ var is_armed: bool = false
 
 # Animation controller reference (set during initialization)
 var animation_controller: PlayerAnimationController = null
+
+# Attack pattern system
+var attack_pattern: AttackPattern = AttackPattern.SEQUENTIAL
+var current_combo_index: int = 0
+var max_combo_count: int = 6  # Default for katana
+var combo_timeout: float = 1.5  # Seconds before combo resets
+var combo_timer: float = 0.0
+var has_completed_first_sequence: bool = false  # For hybrid mode
+var is_attacking: bool = false
 
 
 func _ready():
@@ -35,12 +50,67 @@ func initialize(anim_controller: PlayerAnimationController = null):
 
 func process_combat(delta: float) -> void:
 	"""Main combat processing - called every physics frame"""
-	# TODO: Handle combat state machine
-	# - Attack combos
-	# - Block/parry
-	# - Hit detection
-	# - Damage calculation
-	pass
+	# Update combo timer
+	if combo_timer > 0.0:
+		combo_timer -= delta
+		if combo_timer <= 0.0:
+			# Combo timed out - reset
+			reset_combo()
+
+
+func set_attack_pattern(pattern: AttackPattern) -> void:
+	"""Change the attack pattern mode"""
+	attack_pattern = pattern
+	reset_combo()
+	print("[CombatComponent] Attack pattern set to: ", AttackPattern.keys()[pattern])
+
+
+func reset_combo() -> void:
+	"""Reset the combo state"""
+	current_combo_index = 0
+	combo_timer = 0.0
+	is_attacking = false
+	print("[CombatComponent] Combo reset")
+
+
+func get_next_light_attack_index() -> int:
+	"""Get the next light attack index based on current pattern"""
+	var next_index: int = 0
+	
+	match attack_pattern:
+		AttackPattern.SEQUENTIAL:
+			# Simple sequential: 0->1->2->3->4->5->0
+			next_index = current_combo_index
+			
+		AttackPattern.RANDOM:
+			# Fully random
+			next_index = randi() % max_combo_count
+			
+		AttackPattern.HYBRID:
+			# Sequential first time, then random
+			if not has_completed_first_sequence:
+				next_index = current_combo_index
+			else:
+				next_index = randi() % max_combo_count
+	
+	return next_index
+
+
+func advance_combo() -> void:
+	"""Advance to next attack in combo"""
+	current_combo_index += 1
+	
+	# Check if we completed the sequence
+	if current_combo_index >= max_combo_count:
+		if attack_pattern == AttackPattern.HYBRID and not has_completed_first_sequence:
+			has_completed_first_sequence = true
+			print("[CombatComponent] First sequence completed - switching to random mode")
+		current_combo_index = 0
+	
+	# Reset combo timer
+	combo_timer = combo_timeout
+	
+	print("[CombatComponent] Combo advanced to index: ", current_combo_index, " | Timer: ", combo_timer)
 
 
 func equip_weapon(weapon_data: WeaponData, slot: WeaponData.WeaponSlot) -> void:
