@@ -310,6 +310,11 @@ func _on_light_attack_pressed():
 		print("[Combat] Cannot attack - weapon not armed")
 		return
 	
+	# Prevent attack spam - must wait for combo window or attack to finish
+	if animation_controller.is_attacking and not animation_controller.can_buffer_next_attack:
+		print("[Combat] Attack blocked - still attacking")
+		return
+	
 	# Get next attack index based on current pattern
 	var attack_index = combat_component.get_next_light_attack_index() + 1  # Convert 0-based to 1-based
 	
@@ -383,6 +388,16 @@ func unequip_weapon_slot(slot: WeaponData.WeaponSlot) -> void:
 func set_attack_pattern(pattern: PlayerCombatComponent.AttackPattern) -> void:
 	"""Change the light attack pattern (Sequential, Random, or Hybrid)"""
 	combat_component.set_attack_pattern(pattern)
+
+
+func set_light_attack_speed(speed: float) -> void:
+	"""Set animation speed for light attacks. 1.0 = normal, 0.5 = half speed (for debugging), 2.0 = double speed"""
+	animation_controller.set_light_attack_speed_scale(speed)
+
+
+func set_combo_window(percentage: float) -> void:
+	"""Set when combo window opens. 0.8 = last 20% (tight), 0.5 = last 50% (loose), 0.95 = last 5% (very tight)"""
+	animation_controller.set_combo_window_percentage(percentage)
 
 
 #endregion
@@ -487,6 +502,28 @@ func _on_lock_on_lost() -> void:
 	if camera_controller:
 		camera_controller.clear_lock_on()
 
+
+func _unhandled_input(event):
+	# ... existing code ...
+  # Combo window tightness
+	if event.is_action_pressed("ui_text_toggle_insert_mode"):  # Page Up
+		set_combo_window(25.0)  # Very tight - last 5% only
+		print("Combo window: VERY TIGHT (last 5%)")
+	elif event.is_action_pressed("ui_home"):  # Home
+		set_combo_window(0.8)  # Tight - last 20% (default)
+		print("Combo window: TIGHT (last 20%)")
+	elif event.is_action_pressed("ui_end"):  # End
+		set_combo_window(0.5)  # Loose - last 50%
+		print("Combo window: LOOSE (last 50%)")
+
+
+	# DEBUG: Press F1 to slow attacks, F2 to reset
+	if event.is_action_pressed("ui_page_up"):  # F1 key
+		set_light_attack_speed(0.25)
+		print("Attack speed: 0.25x")
+	elif event.is_action_pressed("ui_page_down"):  # F2 key
+		set_light_attack_speed(1.0)
+		print("Attack speed: 1.0x")
 
 #endregion
 

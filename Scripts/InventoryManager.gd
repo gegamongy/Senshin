@@ -2,6 +2,7 @@ extends Node
 
 var inventory_ui_scene = preload("res://Scenes/UI/InventoryUI.tscn")
 var character_visual_scene = preload("res://Scenes/CharacterVisual.tscn")
+var starting_katana = preload("res://Weapons/StartingKatanaWeaponData.tres")  # Add this line
 var inventory_ui: CanvasLayer = null
 var character_visual: Node3D = null
 var is_open: bool = false
@@ -26,6 +27,8 @@ var hand_offset: Vector3 = Vector3.ZERO  # Adjust as needed for hand grip positi
 func _ready():
 	# Initialize player inventory
 	player_inventory = InventoryData.new()
+	# Add starting items
+	player_inventory.add_item(starting_katana, 1)  # Add this line
 
 
 func toggle_inventory():

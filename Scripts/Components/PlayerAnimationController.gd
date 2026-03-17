@@ -21,6 +21,15 @@ var is_locked_on: bool = false
 var lock_on_target: Node3D = null
 var current_strafe_blend: Vector2 = Vector2.ZERO  # Track current strafe direction
 
+# Combat state
+var is_attacking: bool = false
+var can_buffer_next_attack: bool = false  # Allows combo during last portion of attack
+var current_attack_index: int = 0  # Track current attack for duration lookup
+var attack_sequence_id: int = 0  # Unique ID to invalidate old async tasks
+var light_attack_speed_scale: float = 0.45  # Speed multiplier for debugging
+var combo_window_percentage: float = 0.8  # When combo window opens (0.8 = last 20% of animation)
+var was_airborne: bool = false  # Track airborne state to detect landing
+
 
 func _ready():
 	pass
@@ -42,6 +51,22 @@ func initialize(anim_tree: AnimationTree, body: CharacterBody3D, locomotion_comp
 
 func process_animation(delta: float) -> void:
 	"""Main animation processing - called every physics frame"""
+	# Detect landing (transition from airborne to grounded)
+	var is_currently_grounded = locomotion.get_is_grounded()
+	if is_currently_grounded and was_airborne:
+		# Just landed - cancel any airborne attack in progress
+		if is_attacking:
+			print("[AnimController] Landing detected - cancelling airborne attack")
+			attack_sequence_id += 1  # Cancel async airborne attack task
+			is_attacking = false
+			can_buffer_next_attack = false
+			
+			# CRITICAL: Abort the oneshot so it doesn't resume when returning to Airborne
+			var oneshot_path = "parameters/Airborne/JumpMidair/light_attack/request"
+			animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_ABORT)
+			print("[AnimController] Aborted airborne attack oneshot")
+	was_airborne = not is_currently_grounded
+	
 	# Handle root motion restoration when grounded
 	if locomotion.get_is_grounded() and animation_tree.root_motion_track != original_root_motion_track:
 		animation_tree.root_motion_track = original_root_motion_track
@@ -188,35 +213,79 @@ func play_light_attack_grounded(attack_index: int) -> void:
 		print("[AnimController] ERROR: Invalid attack index: ", attack_index)
 		return
 	
-	# Travel to Combat state
-	state_machine.travel("Combat")
+	# Set attacking flag and increment sequence ID to invalidate old async tasks
+	is_attacking = true
+	can_buffer_next_attack = false
+	current_attack_index = attack_index
+	attack_sequence_id += 1  # Invalidate any previous attack's async task
+	var this_sequence_id = attack_sequence_id  # Capture current ID for this attack
 	
-	# Navigate to LightAttacks state machine
+	# Swap the animation in the LightAttack node
+	var root_state_machine = animation_tree.tree_root as AnimationNodeStateMachine
+	if root_state_machine:
+		var combat_state_machine = root_state_machine.get_node("Combat") as AnimationNodeStateMachine
+		if combat_state_machine:
+			var light_attacks_blend = combat_state_machine.get_node("LightAttacks") as AnimationNodeBlendTree
+			if light_attacks_blend:			
+				# Get the LightAttack animation node from the BlendTree
+				var attack_anim_node = light_attacks_blend.get_node("LightAttack") as AnimationNodeAnimation
+				if attack_anim_node and is_using_weapon_anims:		
+					# Get current weapon prefix from existing animation
+					var current_anim = attack_anim_node.animation
+					var weapon_prefix = current_anim.substr(0, current_anim.rfind("LightAttack"))
+					var new_attack_anim = weapon_prefix + "LightAttack" + str(attack_index)
+					attack_anim_node.animation = new_attack_anim
+					print("[AnimController] Set attack animation to: ", new_attack_anim)
+	
+	# Travel to Combat state and LightAttacks
+	state_machine.travel("Combat")
 	var combat_playback = animation_tree.get("parameters/Combat/playback") as AnimationNodeStateMachinePlayback
 	if combat_playback:
 		combat_playback.travel("LightAttacks")
+		print("[AnimController] Playing grounded attack: LightAttack", attack_index)
 		
-		# Play the specific attack animation
-		var light_attacks_playback = animation_tree.get("parameters/Combat/LightAttacks/playback") as AnimationNodeStateMachinePlayback
-		if light_attacks_playback:
-			var attack_name = "LightAttack" + str(attack_index)
-			light_attacks_playback.travel(attack_name)
-			print("[AnimController] Playing grounded attack: ", attack_name)
-			
-			# Start async task to return to Grounded state after attack completes
-			_auto_return_to_grounded(attack_index)
+		# Start async task to return to Grounded state after attack completes
+		_auto_return_to_grounded(attack_index, this_sequence_id)
 
 
-func _auto_return_to_grounded(attack_index: int) -> void:
+func _auto_return_to_grounded(attack_index: int, sequence_id: int) -> void:
 	"""Automatically return to Grounded state after attack animation completes"""
-	# Wait for animation to complete (use a fixed duration for simplicity)
-	# Most attack animations are ~1 second, wait 0.8 seconds to allow some overlap
-	await animation_tree.get_tree().create_timer(0.8).timeout
+	# Get actual animation duration (reads from AnimationTree TimeScale parameter)
+	var attack_duration = get_light_attack_duration(attack_index)
+	var timescale_param = "parameters/Combat/LightAttacks/LightAttackTimeScale/scale"
+	var actual_timescale = animation_tree.get(timescale_param)
+	if actual_timescale == null or actual_timescale <= 0:
+		actual_timescale = 1.0
+	print("[AnimController] Attack duration: ", attack_duration, "s (base animation / TimeScale: ", actual_timescale, ")")
+	
+	# Wait for X% of animation before allowing combo buffering
+	# combo_window_percentage controls when combos can start (0.8 = last 20% of animation)
+	var combo_window_time = attack_duration * combo_window_percentage
+	await animation_tree.get_tree().create_timer(combo_window_time).timeout
+	
+	# Check if this attack is still the current one (not superseded by combo)
+	if sequence_id != attack_sequence_id:
+		print("[AnimController] Old attack task cancelled (combo started)")
+		return
+	
+	can_buffer_next_attack = true
+	print("[AnimController] Combo window OPENED at ", combo_window_time, "s (last ", int((1.0 - combo_window_percentage) * 100), "% of animation)")
+	
+	# Wait for rest of animation
+	var remaining_time = attack_duration * (1.0 - combo_window_percentage)
+	await animation_tree.get_tree().create_timer(remaining_time).timeout
+	
+	# Check again if this attack is still current (combo might have started during window)
+	if sequence_id != attack_sequence_id:
+		print("[AnimController] Old attack task cancelled (combo during window)")
+		return
 	
 	# Only transition back if we're still in Combat state
 	if state_machine.get_current_node() == "Combat":
 		print("[AnimController] Attack completed - returning to Grounded")
 		state_machine.travel("Grounded")
+		is_attacking = false
+		can_buffer_next_attack = false
 
 
 func play_light_attack_airborne(attack_index: int) -> void:
@@ -224,6 +293,13 @@ func play_light_attack_airborne(attack_index: int) -> void:
 	if attack_index < 1 or attack_index > 6:
 		print("[AnimController] ERROR: Invalid attack index: ", attack_index)
 		return
+	
+	# Set attacking flag and increment sequence ID like grounded attacks
+	is_attacking = true
+	can_buffer_next_attack = false
+	current_attack_index = attack_index
+	attack_sequence_id += 1  # Invalidate any previous attack's async task
+	var this_sequence_id = attack_sequence_id
 	
 	# Get the root state machine
 	var root_state_machine = animation_tree.tree_root as AnimationNodeStateMachine
@@ -254,6 +330,42 @@ func play_light_attack_airborne(attack_index: int) -> void:
 	var oneshot_path = "parameters/Airborne/JumpMidair/light_attack/request"
 	animation_tree.set(oneshot_path, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 	print("[AnimController] Fired airborne light attack oneshot")
+	
+	# Start async task with combo window like grounded attacks
+	_auto_reset_airborne_attack(attack_index, this_sequence_id)
+
+
+func _auto_reset_airborne_attack(attack_index: int, sequence_id: int) -> void:
+	"""Reset airborne attack flags after animation completes with combo window"""
+	# Get actual animation duration (same as grounded attacks)
+	var attack_duration = get_light_attack_duration(attack_index)
+	print("[AnimController] Airborne attack duration: ", attack_duration, "s")
+	
+	# Wait for combo window percentage before allowing next attack
+	var combo_window_time = attack_duration * combo_window_percentage
+	await animation_tree.get_tree().create_timer(combo_window_time).timeout
+	
+	# Check if this attack is still current
+	if sequence_id != attack_sequence_id:
+		print("[AnimController] Old airborne attack task cancelled")
+		return
+	
+	can_buffer_next_attack = true
+	print("[AnimController] Airborne combo window OPENED at ", combo_window_time, "s")
+	
+	# Wait for rest of animation
+	var remaining_time = attack_duration * (1.0 - combo_window_percentage)
+	await animation_tree.get_tree().create_timer(remaining_time).timeout
+	
+	# Check again if this attack is still current
+	if sequence_id != attack_sequence_id:
+		print("[AnimController] Old airborne attack task cancelled (during window)")
+		return
+	
+	# Clear flags
+	is_attacking = false
+	can_buffer_next_attack = false
+	print("[AnimController] Airborne attack cooldown complete")
 
 
 func play_unsheathe_moving() -> void:
@@ -456,6 +568,91 @@ func clear_lock_on() -> void:
 func get_strafe_blend() -> Vector2:
 	"""Get current strafe blend position (X = right/left, Y = forward/back)"""
 	return current_strafe_blend
+
+
+func can_attack() -> bool:
+	"""Check if player can start a new attack (not currently attacking or in combo window)"""
+	return not is_attacking or can_buffer_next_attack
+
+
+func is_in_combo_window() -> bool:
+	"""Check if currently in combo buffering window"""
+	return can_buffer_next_attack
+
+
+func get_light_attack_duration(attack_index: int) -> float:
+	"""Get the actual duration of a light attack animation"""
+	var anim_player = animation_tree.get_node(animation_tree.anim_player) as AnimationPlayer
+	if not anim_player:
+		return 1.0
+	
+	# Try to find the attack animation
+	for lib_name in anim_player.get_animation_library_list():
+		if lib_name == "" or lib_name == "BaseUnarmedLibrary":
+			continue
+		
+		# Get weapon prefix from library name
+		var weapon_prefix = _get_weapon_animation_prefix(lib_name.replace("AnimLibrary", ""))
+		var attack_anim_name = lib_name + "/" + weapon_prefix + "LightAttack" + str(attack_index)
+		
+		if anim_player.has_animation(attack_anim_name):
+			var base_duration = anim_player.get_animation(attack_anim_name).length
+			# Get actual TimeScale from AnimationTree (in case it was changed externally)
+			var timescale_param = "parameters/Combat/LightAttacks/LightAttackTimeScale/scale"
+			var actual_scale = animation_tree.get(timescale_param)
+			# If parameter doesn't exist or is invalid, use the variable value
+			if actual_scale == null or actual_scale <= 0:
+				actual_scale = light_attack_speed_scale
+			# TimeScale: lower value = slower playback = longer duration
+			return base_duration / actual_scale
+	
+	return 1.0  # Fallback
+
+
+func set_combo_window_percentage(percentage: float) -> void:
+	"""Set when combo window opens. 0.8 = last 20% of animation (tight), 0.5 = last 50% (loose)"""
+	combo_window_percentage = clamp(percentage, 0.0, 1.0)
+	print("[AnimController] Set combo window to: ", int((1.0 - combo_window_percentage) * 100), "% of animation")
+
+
+func set_light_attack_speed_scale(speed: float) -> void:
+	"""Set animation speed for all light attacks (for debugging). 1.0 = normal, 0.5 = half speed, 2.0 = double speed"""
+	light_attack_speed_scale = speed
+	print("[AnimController] Set light attack speed scale to: ", speed)
+	
+	# Get the root state machine
+	var root_state_machine = animation_tree.tree_root as AnimationNodeStateMachine
+	if not root_state_machine:
+		return
+	
+	# Get the Combat state machine
+	var combat_state_machine = root_state_machine.get_node("Combat") as AnimationNodeStateMachine
+	if not combat_state_machine:
+		return
+	
+	# Get the LightAttacks blend tree
+	var light_attacks_blend = combat_state_machine.get_node("LightAttacks") as AnimationNodeBlendTree
+	if light_attacks_blend:
+		print("[AnimController] Found LightAttacks BlendTree, updating TimeScale for light attacks")
+		
+		# Set the TimeScale parameter directly - the parameter path proves the node exists
+		var param_path = "parameters/Combat/LightAttacks/LightAttackTimeScale/scale"
+		animation_tree.set(param_path, speed)
+		
+		# Verify it was set
+		var actual_value = animation_tree.get(param_path)
+		print("[AnimController]   Set LightAttackTimeScale to ", speed, " (actual: ", actual_value, ")")
+	else:
+		print("[AnimController] WARNING: LightAttacks BlendTree not found in Combat state machine")
+
+	# Also set for airborne attack if it exists (using TimeScale in JumpMidair if available)
+	# Try to set the parameter directly - if it doesn't exist, set() will silently fail
+	var airborne_param = "parameters/Airborne/JumpMidair/light_attack_timescale/scale"
+	# Check if parameter exists by trying to get it first
+	var test_get = animation_tree.get(airborne_param)
+	if test_get != null:
+		animation_tree.set(airborne_param, speed)
+		print("[AnimController]   Set airborne TimeScale to ", speed)
 
 
 #endregion
@@ -859,22 +1056,24 @@ func _setup_combat_animations(root_state_machine: AnimationNodeStateMachine, wea
 			sheathe_node.animation = weapon_prefix + "Sheathe"
 	
 	# === Setup Light Attacks ===
-	var light_attacks_state = combat_state_machine.get_node("LightAttacks") as AnimationNodeStateMachine
-	if light_attacks_state:
-		print("[AnimController] Setting up light attack animations...")
+	var light_attacks_blend = combat_state_machine.get_node("LightAttacks") as AnimationNodeBlendTree
+	if light_attacks_blend:
+		print("[AnimController] Setting up light attack animation...")
 		
-		# Set up all 6 light attack animation nodes
-		for i in range(1, 7):  # 1 through 6
-			var attack_node_name = "LightAttack" + str(i)
-			var attack_node = light_attacks_state.get_node(attack_node_name) as AnimationNodeAnimation
-			if attack_node:
-				var attack_anim_name = weapon_prefix + "LightAttack" + str(i)
-				attack_node.animation = attack_anim_name
-				print("[AnimController]   ", attack_node_name, " -> ", attack_anim_name)
-			else:
-				print("[AnimController] WARNING: ", attack_node_name, " node not found")
+		# Get the LightAttack animation node from the BlendTree
+		var attack_anim_node = light_attacks_blend.get_node("LightAttack") as AnimationNodeAnimation
+		if attack_anim_node:
+			# Set initial animation to LightAttack1
+			var attack_anim_name = weapon_prefix + "LightAttack1"
+			attack_anim_node.animation = attack_anim_name
+			print("[AnimController]   LightAttack -> ", attack_anim_name)
+		else:
+			print("[AnimController] WARNING: LightAttack animation node not found")
 	else:
-		print("[AnimController] WARNING: LightAttacks state machine not found")
+		print("[AnimController] WARNING: LightAttacks blend tree not found")
+	
+	# Apply the initial speed scale to the TimeScale node
+	set_light_attack_speed_scale(light_attack_speed_scale)
 
 
 func _setup_airborne_attack_animation(root_state_machine: AnimationNodeStateMachine, weapon_prefix: String) -> void:
