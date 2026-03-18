@@ -5,11 +5,10 @@ extends CharacterBody3D
 @export var variant_index: int = 0  # Which variant to use (if variants exist)
 
 # State
-var current_health: float
-var is_dead: bool = false
 var target_player: CharacterBody3D = null
 
 # Components (will be found or created)
+var stats_component: EnemyStatsComponent
 var navigation_agent: NavigationAgent3D
 var detection_area: Area3D
 var skeleton: Skeleton3D
@@ -25,11 +24,17 @@ func _ready():
 		push_error("EnemyBase: No enemy_data assigned!")
 		return
 	
-	# Initialize health
-	current_health = enemy_data.max_health
-	
 	# Setup variant or find existing mesh
 	setup_mesh_variant()
+	
+	# Create and initialize stats component
+	stats_component = EnemyStatsComponent.new()
+	add_child(stats_component)
+	stats_component.initialize(enemy_data)
+	
+	# Connect stats signals
+	stats_component.enemy_died.connect(_on_enemy_died)
+	stats_component.damage_taken.connect(_on_damage_taken)
 	
 	# Find or create components
 	setup_components()
@@ -37,7 +42,7 @@ func _ready():
 	# Add to enemy group
 	add_to_group("enemies")
 	
-	print("Enemy initialized: ", enemy_data.enemy_name, " Health: ", current_health)
+	print("Enemy initialized: ", enemy_data.enemy_name)
 
 
 func setup_mesh_variant():
@@ -96,7 +101,7 @@ func setup_components():
 
 
 func _physics_process(delta):
-	if is_dead:
+	if stats_component and stats_component.is_dead:
 		return
 	
 	apply_gravity(delta)
@@ -144,26 +149,21 @@ func pursue_target(delta: float):
 		rotation.y = lerp_angle(rotation.y, target_rotation, 5.0 * delta)
 
 
-func take_damage(amount: float, attacker: Node = null):
-	if is_dead:
-		return
-	
-	current_health -= amount
-	print(enemy_data.enemy_name, " took ", amount, " damage. Health: ", current_health, "/", enemy_data.max_health)
-	
-	if current_health <= 0:
-		die()
-	else:
-		# TODO: Play hit animation
-		pass
+func take_damage(amount: float, damage_type: String = "physical", attacker: Node = null):
+	"""Apply damage to enemy through stats component"""
+	if stats_component:
+		stats_component.take_damage(amount, damage_type)
 
 
-func die():
-	if is_dead:
-		return
-	
-	is_dead = true
-	print(enemy_data.enemy_name, " died!")
+func _on_damage_taken(amount: float, damage_type: String) -> void:
+	"""Handle damage taken event from stats component"""
+	# TODO: Play hit animation, show damage numbers, etc.
+	pass
+
+
+func _on_enemy_died() -> void:
+	"""Handle death event from stats component"""
+	print("[Enemy] ", enemy_data.enemy_name, " died!")
 	
 	# Spawn loot
 	spawn_loot()
@@ -173,6 +173,12 @@ func die():
 	# Remove after delay
 	await get_tree().create_timer(3.0).timeout
 	queue_free()
+
+
+func die():
+	"""Legacy method - now handled by stats component"""
+	if stats_component:
+		stats_component.die()
 
 
 func spawn_loot():

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="PlayerData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Resources/PlayerData.gd" id="1_default"]
+
+[resource]
+script = ExtResource("1_default")
+max_health = 100.0
+max_stability = 100.0
+strength = 10
+base_move_speed = 5.0
+base_sprint_speed = 8.0
+light_attack_speed_scale = 1.0
+base_damage_multiplier = 1.0
+equipped_primary_weapon = null
+equipped_secondary_weapon = null
+equipped_head = null
+equipped_chest = null
+equipped_legs = null
+equipped_feet = null

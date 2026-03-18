@@ -122,8 +122,8 @@ func equip_item(item: Item) -> bool:
 				print("Error: Player not found")
 				return false
 			
-			# Find skeleton recursively
-			var skeleton = player.find_child("Skeleton3D", true, false)
+			# Find skeleton recursively (OriginalSkeleton is used with retargeting)
+			var skeleton = player.find_child("OriginalSkeleton", true, false)
 			if not skeleton:
 				print("Error: Skeleton not found under player node: ", player.name)
 				print("Player children: ", player.get_children())
@@ -247,7 +247,7 @@ func set_weapon_armed_state(is_armed: bool, slot: WeaponData.WeaponSlot = Weapon
 		print("[InventoryManager] Error: Player not found")
 		return
 	
-	var skeleton = player.find_child("Skeleton3D", true, false)
+	var skeleton = player.find_child("OriginalSkeleton", true, false)
 	if not skeleton:
 		print("[InventoryManager] Error: Skeleton not found")
 		return

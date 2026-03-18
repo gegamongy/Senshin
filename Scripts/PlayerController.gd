@@ -14,7 +14,11 @@ var combat_component: PlayerCombatComponent
 var animation_controller: PlayerAnimationController
 var camera_controller: CameraController
 var lock_on_component: PlayerLockOnComponent
+var stats_component: PlayerStatsComponent
 var player_state_machine: StateMachine
+
+# Player data
+@export var player_data: PlayerData
 
 # Pickup tracking
 var nearby_pickups: Array[WeaponBase] = []
@@ -22,6 +26,9 @@ var nearby_pickups: Array[WeaponBase] = []
 # Sheathe/unsheathe state
 var is_sheathe_action_in_progress: bool = false
 var pending_delayed_operation: bool = false  # Track if there's a delayed unarm/unsheathe in progress
+
+# Debug: Animation speed transition control
+var transition_duration: float = 0.5  # Duration for smooth speed transitions
 
 
 func _ready():
@@ -41,6 +48,7 @@ func setup_components():
 	animation_controller = PlayerAnimationController.new()
 	camera_controller = CameraController.new()
 	lock_on_component = PlayerLockOnComponent.new()
+	stats_component = PlayerStatsComponent.new()
 	
 	# Add as children
 	add_child(input_component)
@@ -49,13 +57,23 @@ func setup_components():
 	add_child(animation_controller)
 	add_child(camera_controller)
 	add_child(lock_on_component)
+	add_child(stats_component)
 	
 	# Initialize components with required references
 	locomotion_component.initialize(self)
-	animation_controller.initialize(animation_tree, self, locomotion_component)
+	animation_controller.initialize(animation_tree, self, locomotion_component, player_data)
 	combat_component.initialize(animation_controller)
 	camera_controller.initialize(camera_pivot, camera, self, input_component)
 	lock_on_component.initialize(self, camera)
+	
+	# Initialize stats with player data
+	if player_data:
+		stats_component.initialize(player_data)
+	else:
+		push_error("PlayerController: No PlayerData assigned! Using defaults.")
+		# Create default data as fallback
+		var default_data = PlayerData.new()
+		stats_component.initialize(default_data)
 	
 	# Setup state machine
 	setup_state_machine()
@@ -72,6 +90,11 @@ func setup_components():
 	# Connect lock-on signals
 	lock_on_component.lock_on_acquired.connect(_on_lock_on_acquired)
 	lock_on_component.lock_on_lost.connect(_on_lock_on_lost)
+	
+	# Connect stats signals
+	stats_component.health_changed.connect(_on_health_changed)
+	stats_component.stability_changed.connect(_on_stability_changed)
+	stats_component.player_died.connect(_on_player_died)
 
 
 func setup_state_machine():
@@ -378,11 +401,31 @@ func _delayed_unarm_weapon() -> void:
 func equip_weapon_data(weapon_data: WeaponData) -> void:
 	"""Called by InventoryManager when a weapon is equipped"""
 	combat_component.equip_weapon(weapon_data, weapon_data.weapon_slot)
+	
+	# Update StatsComponent equipped weapon for stat tracking
+	if stats_component:
+		match weapon_data.weapon_slot:
+			WeaponData.WeaponSlot.PRIMARY:
+				stats_component.equipped_primary_weapon = weapon_data
+				print("[Player] Equipped primary weapon: ", weapon_data.item_name)
+			WeaponData.WeaponSlot.SECONDARY:
+				stats_component.equipped_secondary_weapon = weapon_data
+				print("[Player] Equipped secondary weapon: ", weapon_data.item_name)
 
 
 func unequip_weapon_slot(slot: WeaponData.WeaponSlot) -> void:
 	"""Called by InventoryManager when a weapon is unequipped"""
 	combat_component.unequip_weapon(slot)
+	
+	# Update StatsComponent equipped weapon
+	if stats_component:
+		match slot:
+			WeaponData.WeaponSlot.PRIMARY:
+				stats_component.equipped_primary_weapon = null
+				print("[Player] Unequipped primary weapon")
+			WeaponData.WeaponSlot.SECONDARY:
+				stats_component.equipped_secondary_weapon = null
+				print("[Player] Unequipped secondary weapon")
 
 
 func set_attack_pattern(pattern: PlayerCombatComponent.AttackPattern) -> void:
@@ -393,6 +436,21 @@ func set_attack_pattern(pattern: PlayerCombatComponent.AttackPattern) -> void:
 func set_light_attack_speed(speed: float) -> void:
 	"""Set animation speed for light attacks. 1.0 = normal, 0.5 = half speed (for debugging), 2.0 = double speed"""
 	animation_controller.set_light_attack_speed_scale(speed)
+
+
+func smooth_set_light_attack_speed(target_speed: float, duration: float = 0.3, trans_type: Tween.TransitionType = Tween.TRANS_SINE) -> void:
+	"""Smoothly transition light attack speed over time.
+	
+	Args:
+		target_speed: Target speed (1.0 = normal, 0.5 = half, 2.0 = double)
+		duration: Transition time in seconds (default: 0.3)
+		trans_type: Tween type - TRANS_SINE (smooth), TRANS_QUAD (stronger), TRANS_ELASTIC (bouncy), etc.
+	
+	Example:
+		smooth_set_light_attack_speed(0.5, 0.5)  # Slow down to half speed over 0.5 seconds
+		smooth_set_light_attack_speed(1.0, 0.3, Tween.TRANS_ELASTIC)  # Speed up with elastic bounce
+	"""
+	animation_controller.smooth_set_light_attack_speed_scale(target_speed, duration, trans_type)
 
 
 func set_combo_window(percentage: float) -> void:
@@ -503,28 +561,75 @@ func _on_lock_on_lost() -> void:
 		camera_controller.clear_lock_on()
 
 
-func _unhandled_input(event):
-	# ... existing code ...
-  # Combo window tightness
-	if event.is_action_pressed("ui_text_toggle_insert_mode"):  # Page Up
-		set_combo_window(25.0)  # Very tight - last 5% only
-		print("Combo window: VERY TIGHT (last 5%)")
-	elif event.is_action_pressed("ui_home"):  # Home
-		set_combo_window(0.8)  # Tight - last 20% (default)
-		print("Combo window: TIGHT (last 20%)")
-	elif event.is_action_pressed("ui_end"):  # End
-		set_combo_window(0.5)  # Loose - last 50%
-		print("Combo window: LOOSE (last 50%)")
+#endregion
 
 
-	# DEBUG: Press F1 to slow attacks, F2 to reset
-	if event.is_action_pressed("ui_page_up"):  # F1 key
-		set_light_attack_speed(0.25)
-		print("Attack speed: 0.25x")
-	elif event.is_action_pressed("ui_page_down"):  # F2 key
-		set_light_attack_speed(1.0)
-		print("Attack speed: 1.0x")
+#region Stats Signal Handlers
+
+func _on_health_changed(current: float, max_health: float, delta: float) -> void:
+	"""Handle health changes from stats component"""
+	print("[Player] Health: ", current, "/", max_health, " (", delta, ")")
+	# TODO: Update UI health bar
+
+
+func _on_stability_changed(current: float, max_stability: float, delta: float) -> void:
+	"""Handle stability changes from stats component"""
+	# TODO: Update UI stability bar
+	pass
+
+
+func _on_player_died() -> void:
+	"""Handle player death"""
+	print("[Player] Player died!")
+	# TODO: Trigger death animation, game over screen, etc.
+	pass
+
 
 #endregion
+
+
+#region Debug Input
+
+func _unhandled_input(event):
+	# DEBUG: Adjust animation speed transition duration
+	if event.is_action_pressed("ui_text_toggle_insert_mode"):  # Page Up
+		transition_duration += 0.1
+		transition_duration = min(transition_duration, 3.0)  # Cap at 3 seconds
+		print("Transition duration: ", transition_duration, "s (slower curves)")
+	elif event.is_action_pressed("ui_page_down"):  # Page Down
+		transition_duration -= 0.1
+		transition_duration = max(transition_duration, 0.1)  # Min 0.1 seconds
+		print("Transition duration: ", transition_duration, "s (faster curves)")
+
+	# DEBUG: F keys for animation speed testing with different transition curves
+	# F1: Instant set to variable value (no smooth)
+	# F2-F5: Smooth transitions with different curves
+	if event.is_action_pressed("smooth_step_attacks"):  # F1 key
+		if animation_controller:
+			var target_speed = animation_controller.light_attack_speed_scale
+			set_light_attack_speed(target_speed)
+			print("Attack speed: ", target_speed, "x (instant - no transition)")
+	elif event.is_action_pressed("no_smooth_attacks"):  # F2 key
+		if animation_controller:
+			var target_speed = animation_controller.light_attack_speed_scale
+			smooth_set_light_attack_speed(target_speed, transition_duration, Tween.TRANS_SINE)
+			print("Attack speed: ", target_speed, "x (SINE curve, ", transition_duration, "s)")
+	elif event.is_action_pressed("smooth_step_quad"):  # F3 key
+		if animation_controller:
+			var target_speed = animation_controller.light_attack_speed_scale
+			smooth_set_light_attack_speed(target_speed, transition_duration, Tween.TRANS_QUAD)
+			print("Attack speed: ", target_speed, "x (QUAD curve, ", transition_duration, "s)")
+	elif event.is_action_pressed("smooth_step_cubic"):  # F4 key
+		if animation_controller:
+			var target_speed = animation_controller.light_attack_speed_scale
+			smooth_set_light_attack_speed(target_speed, transition_duration, Tween.TRANS_CUBIC)
+			print("Attack speed: ", target_speed, "x (CUBIC curve, ", transition_duration, "s)")
+	elif event.is_action_pressed("smooth_step_elastic"):  # F5 key
+		if animation_controller:
+			var target_speed = animation_controller.light_attack_speed_scale
+			smooth_set_light_attack_speed(target_speed, transition_duration, Tween.TRANS_ELASTIC)
+			print("Attack speed: ", target_speed, "x (ELASTIC curve, ", transition_duration, "s)")
+
+
 
 #endregion

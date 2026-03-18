@@ -26,7 +26,7 @@ var is_attacking: bool = false
 var can_buffer_next_attack: bool = false  # Allows combo during last portion of attack
 var current_attack_index: int = 0  # Track current attack for duration lookup
 var attack_sequence_id: int = 0  # Unique ID to invalidate old async tasks
-var light_attack_speed_scale: float = 0.45  # Speed multiplier for debugging
+var light_attack_speed_scale: float = 0.25  # Speed multiplier for debugging
 var combo_window_percentage: float = 0.8  # When combo window opens (0.8 = last 20% of animation)
 var was_airborne: bool = false  # Track airborne state to detect landing
 
@@ -35,12 +35,19 @@ func _ready():
 	pass
 
 
-func initialize(anim_tree: AnimationTree, body: CharacterBody3D, locomotion_component: PlayerLocomotionComponent):
+func initialize(anim_tree: AnimationTree, body: CharacterBody3D, locomotion_component: PlayerLocomotionComponent, player_data: PlayerData = null):
 	"""Initialize with references to animation tree and other components"""
 	animation_tree = anim_tree
 	character_body = body
 	locomotion = locomotion_component
 	state_machine = animation_tree.get("parameters/playback")
+	
+	# Initialize from player data if provided
+	if player_data:
+		light_attack_speed_scale = player_data.light_attack_speed_scale
+		combo_window_percentage = player_data.combo_window_percentage
+		print("[AnimController] Initialized from PlayerData - Speed: ", light_attack_speed_scale, 
+			  " Combo: ", combo_window_percentage)
 	
 	# Ensure AnimationTree processes in physics mode
 	animation_tree.set_process_callback(AnimationTree.ANIMATION_PROCESS_PHYSICS)
@@ -653,6 +660,45 @@ func set_light_attack_speed_scale(speed: float) -> void:
 	if test_get != null:
 		animation_tree.set(airborne_param, speed)
 		print("[AnimController]   Set airborne TimeScale to ", speed)
+
+
+func smooth_set_light_attack_speed_scale(target_speed: float, duration: float = 0.3, trans_type: Tween.TransitionType = Tween.TRANS_SINE, ease_type: Tween.EaseType = Tween.EASE_IN_OUT) -> void:
+	"""Smoothly transition light attack speed over time using a tween.
+	
+	Args:
+		target_speed: Target speed scale (1.0 = normal, 0.5 = half speed, 2.0 = double speed)
+		duration: Transition duration in seconds (default: 0.3)
+		trans_type: Tween transition type (TRANS_SINE, TRANS_QUAD, TRANS_CUBIC, etc.)
+		ease_type: Tween ease type (EASE_IN, EASE_OUT, EASE_IN_OUT)
+	"""
+	var param_path = "parameters/Combat/LightAttacks/LightAttackTimeScale/scale"
+	var current_speed = animation_tree.get(param_path)
+	
+	# Fallback to variable if parameter doesn't exist yet
+	if current_speed == null or current_speed <= 0:
+		current_speed = light_attack_speed_scale
+	
+	print("[AnimController] Smoothly transitioning attack speed from ", current_speed, " to ", target_speed, " over ", duration, "s")
+	
+	# Update the variable
+	light_attack_speed_scale = target_speed
+	
+	# Create tween for smooth transition
+	var tween = create_tween()
+	tween.set_trans(trans_type)
+	tween.set_ease(ease_type)
+	
+	# Tween the grounded attack TimeScale
+	tween.tween_property(animation_tree, param_path, target_speed, duration).from(current_speed)
+	
+	# Also tween airborne attack if it exists
+	var airborne_param = "parameters/Airborne/JumpMidair/light_attack_timescale/scale"
+	var test_get = animation_tree.get(airborne_param)
+	if test_get != null:
+		tween.parallel().tween_property(animation_tree, airborne_param, target_speed, duration).from(test_get)
+	
+	# Log completion
+	tween.finished.connect(func(): print("[AnimController] Speed transition complete: ", target_speed))
 
 
 #endregion
