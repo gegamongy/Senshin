@@ -530,11 +530,7 @@ func unarm_secondary_weapon() -> void:
 	InventoryManager.unarm_secondary_weapon()
 
 
-func complete_sheathe() -> void:
-	"""Complete sheathe action - restore unarmed animations.
-	Called from animation event at the end of sheathe animations."""
-	if combat_component:
-		combat_component.unarm_weapon()
+#endregion
 
 
 #region Lock-On Signal Handlers

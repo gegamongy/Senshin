@@ -720,7 +720,8 @@ func apply_root_motion(delta: float) -> void:
 		root_motion_velocity = character_body.global_transform.basis * (root_motion / capped_delta)
 		var root_motion_rotation = animation_tree.get_root_motion_rotation()
 		var euler = root_motion_rotation.get_euler(EULER_ORDER_YXZ)
-		locomotion.apply_root_motion_rotation(-euler.z)
+		# Use Y axis for rotation (Godot's up axis) instead of Z (Blender's up axis before retargeting)
+		locomotion.apply_root_motion_rotation(euler.y)
 		character_body.velocity.x = root_motion_velocity.x
 		character_body.velocity.z = root_motion_velocity.z
 	elif locomotion.is_strafing:
