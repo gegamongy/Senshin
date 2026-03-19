@@ -3,6 +3,8 @@ class_name PlayerAnimationController
 
 ## Manages direct animation playback and root motion - no automatic transitions
 
+signal sheathe_oneshot_completed  # Emitted when running sheathe animation completes
+
 var animation_tree: AnimationTree
 var state_machine: AnimationNodeStateMachinePlayback
 var character_body: CharacterBody3D
@@ -28,6 +30,10 @@ var current_attack_index: int = 0  # Track current attack for duration lookup
 var attack_sequence_id: int = 0  # Unique ID to invalidate old async tasks
 var light_attack_speed_scale: float = 0.25  # Speed multiplier for debugging
 var combo_window_percentage: float = 0.8  # When combo window opens (0.8 = last 20% of animation)
+
+# Sheathe/unsheathe tracking
+var is_waiting_for_sheathe_complete: bool = false  # Track if we need to swap to unarmed after sheathe
+var sheathe_monitoring_started: bool = false  # Prevent checking completion on the first frame
 var was_airborne: bool = false  # Track airborne state to detect landing
 
 
@@ -89,6 +95,19 @@ func process_animation(delta: float) -> void:
 	
 	# Update animation blend parameters for Grounded state machine
 	update_grounded_blend_parameters()
+	
+	# Monitor for sheathe oneshot completion
+	if is_waiting_for_sheathe_complete:
+		# Skip first frame - give oneshot time to start
+		if not sheathe_monitoring_started:
+			sheathe_monitoring_started = true
+		else:
+			var sheathe_active = animation_tree.get("parameters/Grounded/sheathe/active")
+			if not sheathe_active:
+				print("[AnimController] Sheathe oneshot complete - emitting signal")
+				is_waiting_for_sheathe_complete = false
+				sheathe_monitoring_started = false
+				sheathe_oneshot_completed.emit()
 
 
 #region Direct Animation Playback
@@ -437,6 +456,12 @@ func play_sheathe_moving() -> void:
 	await animation_tree.get_tree().process_frame
 	var did_fire = animation_tree.get(oneshot_active_path)
 	print("[Oneshot] Sheathe oneshot active after fire: ", did_fire)
+	
+	# Only start monitoring if the oneshot actually activated
+	if did_fire:
+		is_waiting_for_sheathe_complete = true
+	else:
+		print("[Oneshot] ERROR: Sheathe oneshot failed to activate!")
 
 
 func get_unsheathe_duration() -> float:

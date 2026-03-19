@@ -91,6 +91,9 @@ func setup_components():
 	lock_on_component.lock_on_acquired.connect(_on_lock_on_acquired)
 	lock_on_component.lock_on_lost.connect(_on_lock_on_lost)
 	
+	# Connect animation signals
+	animation_controller.sheathe_oneshot_completed.connect(_on_sheathe_oneshot_completed)
+	
 	# Connect stats signals
 	stats_component.health_changed.connect(_on_health_changed)
 	stats_component.stability_changed.connect(_on_stability_changed)
@@ -293,10 +296,9 @@ func _on_sheathe_unsheathe_pressed():
 		if has_motion:
 			# Continue grounded state, fire sheathe oneshot
 			print("[Sheathe] → Unarming with motion (oneshot)")
-			animation_controller.play_sheathe_moving()
 			
-			# Start async task to swap animations after oneshot completes
-			_delayed_unarm_weapon()
+			# Play sheathe oneshot animation (while still in armed library)
+			animation_controller.play_sheathe_moving()
 			
 			# Clear flag immediately so player can move
 			is_sheathe_action_in_progress = false
@@ -371,25 +373,6 @@ func _delayed_unsheathe() -> void:
 	
 	print("[Sheathe] AnimationTree updated, firing oneshot")
 	animation_controller.play_unsheathe_moving()
-	pending_delayed_operation = false
-
-
-func _delayed_unarm_weapon() -> void:
-	"""Async helper: Wait for sheathe animation then swap back to unarmed (doesn't block input)"""
-	pending_delayed_operation = true
-	
-	var duration = animation_controller.get_sheathe_duration()
-	print("[Sheathe] Waiting ", duration, " seconds for oneshot to complete")
-	await get_tree().create_timer(duration * 0.8).timeout  # Wait 80% to blend out smoothly
-	
-	# Check if operation was cancelled (player toggled again)
-	if not pending_delayed_operation:
-		print("[Sheathe] Delayed unarm cancelled")
-		return
-	
-	# Unarm the weapon (swap back to unarmed animations)
-	combat_component.unarm_weapon()
-	print("[Sheathe] → Unarmed")
 	pending_delayed_operation = false
 
 
@@ -529,6 +512,17 @@ func unarm_secondary_weapon() -> void:
 	"""Forward animation event to InventoryManager"""
 	InventoryManager.unarm_secondary_weapon()
 
+
+#endregion
+
+
+#region Animation Signal Handlers
+
+func _on_sheathe_oneshot_completed() -> void:
+	"""Handle completion of running sheathe animation - swap back to unarmed library"""
+	if combat_component and combat_component.is_armed:
+		print("[Player] Sheathe oneshot completed - unarming weapon")
+		combat_component.unarm_weapon()
 
 #endregion
 
