@@ -28,8 +28,8 @@ var is_attacking: bool = false
 var can_buffer_next_attack: bool = false  # Allows combo during last portion of attack
 var current_attack_index: int = 0  # Track current attack for duration lookup
 var attack_sequence_id: int = 0  # Unique ID to invalidate old async tasks
-var light_attack_speed_scale: float = 0.25  # Speed multiplier for debugging
-var combo_window_percentage: float = 0.8  # When combo window opens (0.8 = last 20% of animation)
+var light_attack_speed_scale: float = 1.0  # Speed multiplier for debugging
+var combo_window_percentage: float = 1.0  # When combo window opens (0.8 = last 20% of animation)
 
 # Sheathe/unsheathe tracking
 var is_waiting_for_sheathe_complete: bool = false  # Track if we need to swap to unarmed after sheathe
@@ -119,8 +119,16 @@ func play_animation(anim_name: String) -> void:
 
 func play_grounded_movement() -> void:
 	"""Play the grounded movement blend space"""
+	# Don't interrupt attacks or important animations
+	var current_state = state_machine.get_current_node()
+	
+	# Don't interrupt active attacks (but allow sheathe/unsheathe to finish)
+	if current_state == "Combat" and is_attacking:
+		print("[AnimController] Skipping grounded movement travel - attack in progress")
+		return
+	
 	# If we're already in Grounded state, check if a oneshot is active
-	if state_machine.get_current_node() == "Grounded":
+	if current_state == "Grounded":
 		# Check if either oneshot is active - don't interrupt them
 		var unsheathe_active = animation_tree.get("parameters/Grounded/unsheathe/active")
 		var sheathe_active = animation_tree.get("parameters/Grounded/sheathe/active")
@@ -1166,8 +1174,8 @@ func _setup_airborne_attack_animation(root_state_machine: AnimationNodeStateMach
 	# Try to get the light attack oneshot - it might not exist yet
 	var light_attack_oneshot = jump_midair_blend.get_node("light_attack") as AnimationNodeOneShot
 	if light_attack_oneshot:
-		light_attack_oneshot.fadein_time = 0.1
-		light_attack_oneshot.fadeout_time = 0.2
+		light_attack_oneshot.fadein_time = 0.0  # Instant start for responsiveness
+		light_attack_oneshot.fadeout_time = 0.0 # No fade out to allow quick recovery
 		light_attack_oneshot.autorestart = false
 		light_attack_oneshot.mix_mode = AnimationNodeOneShot.MIX_MODE_BLEND
 		light_attack_oneshot.filter_enabled = false  # Allow all tracks (or enable for upper body only)

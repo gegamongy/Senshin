@@ -74,7 +74,7 @@ func process_stats(delta: float) -> void:
 
 
 func take_damage(amount: float) -> void:
-	"""Apply damage to player"""
+	"""Apply simple damage to player (legacy - prefer take_damage_typed)"""
 	if is_dead:
 		return
 	
@@ -85,6 +85,40 @@ func take_damage(amount: float) -> void:
 	current_health = max(0.0, current_health)
 	
 	print("[PlayerStats] Took ", actual_damage, " damage. Health: ", current_health, "/", player_data.max_health)
+	health_changed.emit(current_health, player_data.max_health, -actual_damage)
+	
+	if current_health <= 0.0 and not is_dead:
+		die()
+
+
+func take_damage_typed(damage: DamageTypes.DamageInstance) -> void:
+	"""Apply typed damage to player with resistance calculations"""
+	if is_dead:
+		return
+	
+	# Get player resistances from PlayerData
+	var resistances = player_data.get_resistance_set()
+	
+	# Apply resistances to incoming damage
+	var modified_damage = resistances.apply_to_damage(damage)
+	
+	# Apply global defense modifier
+	var total_damage = modified_damage.get_total_damage()
+	var actual_damage = max(0.0, total_damage - defense_modifier) * damage_modifier
+	
+	current_health -= actual_damage
+	current_health = max(0.0, current_health)
+	
+	# Log detailed damage breakdown
+	print("[PlayerStats] Took typed damage:")
+	if modified_damage.get_physical_total() > 0:
+		print("  Physical: ", modified_damage.get_physical_total(), " (B:", modified_damage.blunt, " S:", modified_damage.slash, " P:", modified_damage.pierce, ")")
+	if modified_damage.get_elemental_total() > 0:
+		print("  Elemental: ", modified_damage.get_elemental_total(), " (F:", modified_damage.fire, " L:", modified_damage.lightning, " W:", modified_damage.water, " Soul:", modified_damage.soul, ")")
+	if modified_damage.get_magic_total() > 0:
+		print("  Magic: ", modified_damage.get_magic_total(), " (V:", modified_damage.void_, " A:", modified_damage.astral, ")")
+	print("  Total after modifiers: ", actual_damage, " | Health: ", current_health, "/", player_data.max_health)
+	
 	health_changed.emit(current_health, player_data.max_health, -actual_damage)
 	
 	if current_health <= 0.0 and not is_dead:

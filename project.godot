@@ -23,6 +23,9 @@ config/icon="res://icon.svg"
 [autoload]
 
 InventoryManager="*uid://bmgomgyqpknly"
+ConsoleManager="*res://Scripts/ConsoleManager.gd"
+ConsoleUI="*res://Scenes/UI/ConsoleUI.tscn"
+DebugCommands="*res://Scripts/DebugCommands.gd"
 
 [display]
 

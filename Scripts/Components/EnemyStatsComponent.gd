@@ -61,7 +61,7 @@ func _process(delta: float) -> void:
 
 
 func take_damage(amount: float, damage_type: String = "physical") -> float:
-	"""Apply damage to enemy. Returns actual damage dealt after reductions."""
+	"""Apply simple damage to enemy (legacy - prefer take_damage_typed). Returns actual damage dealt."""
 	if is_dead:
 		return 0.0
 	
@@ -80,6 +80,48 @@ func take_damage(amount: float, damage_type: String = "physical") -> float:
 	damage_taken.emit(actual_damage, damage_type)
 	
 	# Reduce poise
+	current_poise = max(0.0, current_poise - actual_damage * 0.5)
+	
+	# Check for death
+	if current_health <= 0.0 and not is_dead:
+		die()
+	
+	return actual_damage
+
+
+func take_damage_typed(damage: DamageTypes.DamageInstance) -> float:
+	"""Apply typed damage to enemy with resistance calculations. Returns actual damage dealt."""
+	if is_dead:
+		return 0.0
+	
+	# Get enemy resistances from EnemyData
+	var resistances = enemy_data.get_resistance_set()
+	
+	# Apply resistances to incoming damage
+	var modified_damage = resistances.apply_to_damage(damage)
+	
+	# Apply global defense modifier
+	var total_damage = modified_damage.get_total_damage()
+	var actual_damage = max(0.0, total_damage - defense_modifier)
+	
+	# Reduce health
+	current_health = max(0.0, current_health - actual_damage)
+	
+	# Log detailed damage breakdown
+	print("[EnemyStats] ", enemy_data.enemy_name, " took typed damage:")
+	if modified_damage.get_physical_total() > 0:
+		print("  Physical: ", modified_damage.get_physical_total(), " (B:", modified_damage.blunt, " S:", modified_damage.slash, " P:", modified_damage.pierce, ")")
+	if modified_damage.get_elemental_total() > 0:
+		print("  Elemental: ", modified_damage.get_elemental_total(), " (F:", modified_damage.fire, " L:", modified_damage.lightning, " W:", modified_damage.water, " Soul:", modified_damage.soul, ")")
+	if modified_damage.get_magic_total() > 0:
+		print("  Magic: ", modified_damage.get_magic_total(), " (V:", modified_damage.void_, " A:", modified_damage.astral, ")")
+	print("  Total after modifiers: ", actual_damage, " | Health: ", current_health, "/", enemy_data.max_health)
+	
+	# Emit signals
+	health_changed.emit(current_health, enemy_data.max_health, -actual_damage)
+	damage_taken.emit(actual_damage, "typed")
+	
+	# Reduce poise based on damage dealt
 	current_poise = max(0.0, current_poise - actual_damage * 0.5)
 	
 	# Check for death
